@@ -1007,21 +1007,19 @@ class HomeStage(
     }
 
     /**
-     * 频谱宽度 = 歌手左沿到「上一首」左沿的三分之二，再按这一格实际剩下的宽度封顶。
+     * 频谱右端一直伸到「上一首」前，两端各留 12dp，整条在这一格里居中。
      *
-     * 写死 dp 值不行：歌手名长到 180dp 时，剩下的地方比一个固定的宽条还窄，
-     * 柱子会直接压到按钮上。量真实坐标还能让以后改底栏边距时不必回来改一个数。
-     * 只在布局完成后跑；宽度没变就不重新设 layoutParams，免得自己和自己来回触发布局。
+     * 写死 dp 值不行：歌手名长到 180dp 时这一格会跟着变窄，柱子会压到按钮上。
+     * 量真实坐标还能让以后改底栏边距时不必回来改一个数。只在布局完成后跑；
+     * 宽度没变就不重新设 layoutParams，免得自己和自己来回触发布局。
      */
     private fun sizeBarSpectrum() {
         val from = IntArray(2)
         val to = IntArray(2)
-        barArtist.getLocationInWindow(from)
+        barPaneBox.getLocationInWindow(from)
         barPrev.getLocationInWindow(to)
-        val span = to[0] - from[0]
-        if (span <= 0) return
-        val box = barSpectrum.parent as? View ?: return
-        val width = minOf(span * 2 / 3, box.width)
+        val gap = (12 * activity.resources.displayMetrics.density + 0.5f).toInt()
+        val width = minOf(to[0] - from[0] - gap * 2, barPaneBox.width - gap * 2)
         if (width <= 0) return
         val lp = barSpectrum.layoutParams
         if (lp.width != width) {

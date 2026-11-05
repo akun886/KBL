@@ -218,9 +218,9 @@ class SpectrumView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         if (width <= 0 || height <= 0) return
-        // 首页底栏那条只有 36×14dp：环形要一块方形的地才画得出圈，塞进去只剩一个橙点；
-        // 波形 96 个采样摊在 72 个像素上是一道糊。窄条上一律画柱状——
-        // 三种样式是给播放页那块大图的，条带里能读出来的只有柱子。
+        // 首页底栏那条只有 14dp 高（宽度按「上一首」位置算，见 HomeStage.sizeBarSpectrum）：
+        // 环形要一块方形的地才画得出圈，塞进去只剩一个橙点；波形 96 个采样摊在
+        // 一条扁带里是一道糊。窄条上一律画柱状——三种样式是给播放页那块大图的。
         val narrow = height < dp(28f)
         when (mode) {
             Mode.MINI -> drawBars(canvas, MINI_BARS, mini)

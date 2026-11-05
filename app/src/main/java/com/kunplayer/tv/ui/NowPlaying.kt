@@ -666,6 +666,9 @@ class NowPlaying(
 
     fun isListOpen(): Boolean = pane == Pane.LIST
 
+    /** 焦点是不是停在右下角档位键上。列表档时按 ↓ 从这儿进曲目表 */
+    fun isPaneButtonFocused(): Boolean = btnList.hasFocus()
+
     /** 焦点在列表里时，上下键归列表自己选歌 */
     fun isListFocused(): Boolean = listView.hasFocus()
 
@@ -710,9 +713,11 @@ class NowPlaying(
     fun cyclePane() {
         val from = pane
         val to = nextPane(from)
-        // 离开列表时焦点必须跟着走：列表与抬头马上 GONE，停在里面的焦点会悬空，
-        // 之后每个方向键都像按在空处
-        if (from == Pane.LIST) btnList.requestFocus()
+        // 切档时光标始终留在右下角这颗键上：连按几下就能把三档看完，
+        // 中间不该被拽进曲目表。离开列表时更必须主动带走——列表与抬头随即
+        // GONE，焦点留在里面会悬空，之后每个方向键都像按在空处。
+        // 真要看列表，从档位键按 ↓ 自己下来（playerKey 接管）
+        btnList.requestFocus()
         if (to == Pane.LIST) {
             beforeList = from
             fillList()
@@ -720,7 +725,6 @@ class NowPlaying(
         userPicked = true
         pane = to
         paintRight()
-        if (to == Pane.LIST) focusCurrentRow()
         Diag.confirm(
             "右栏 → " + when (to) {
                 Pane.LYRICS -> "歌词"

@@ -149,7 +149,7 @@
     <!-- 下一首预告。只有「顺序」模式才画：单曲循环的下一首就是它自己，
          随机的下一首没法预告，写了都是骗人的 -->
     <string name="now_up_next">下一首 · %1$s</string>
-    <string name="now_keys">方向键 移动光标　确认 执行图标　进度条左右 快进快退\n右下角 轮换歌词/列表/频谱，列表里按右继续</string>
+    <string name="now_keys">方向键 移动光标　确认 执行图标　进度条左右 快进快退\n右下角 轮换歌词/列表/频谱，按 ↓ 进列表，列表里按右继续</string>
     <string name="now_lyrics_none">暂无歌词</string>
     <string name="now_lyrics_no_sub">B 站没有为这首歌提供字幕</string>
     <string name="now_lyrics_not_lyric">字幕内容不像是歌词，已隐藏</string>

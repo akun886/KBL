@@ -629,13 +629,20 @@ class MainActivity : Activity() {
                     false
                 }
             }
-            // 从叉往下回到列表：否则焦点会跑到左栏，人还没看列表就被带走了
             KeyEvent.KEYCODE_DPAD_DOWN -> {
-                if (stage.isListCloseFocused()) {
-                    stage.focusCurrentRow()
-                    true
-                } else {
-                    false
+                when {
+                    // 从叉往下回到列表：否则焦点会跑到左栏，人还没看列表就被带走了
+                    stage.isListCloseFocused() -> {
+                        stage.focusCurrentRow()
+                        true
+                    }
+                    // 切到列表档时焦点留在档位键上，按 ↓ 才进曲目表。
+                    // 下键在档位键上原本无处可去，拿它当入口不占任何老路径
+                    stage.isListOpen() && stage.isPaneButtonFocused() -> {
+                        stage.focusCurrentRow()
+                        true
+                    }
+                    else -> false
                 }
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> false

@@ -484,14 +484,15 @@
                             android:textColor="@color/text_secondary"
                             android:textSize="12sp" />
 
-                        <!-- 36dp 只是布局期占位。上屏后按「歌手左沿 → 上一首按钮左沿」
-                             跨度的三分之二重算宽度（HomeStage.sizeBarSpectrum），
-                             并按这一格实际剩余的宽度封顶，歌名再长也不会压到按钮上。 -->
+                        <!-- match_parent 只是布局期占位。上屏后按「这一格左沿 → 上一首按钮左沿」
+                             的真实坐标重算宽度（HomeStage.sizeBarSpectrum），右端到按钮前
+                             留 12dp、左右对称，整条在这一格里居中。歌手名变长时这一格
+                             自己会变窄，写死宽值就会压到按钮上。 -->
                         <com.kunplayer.tv.ui.SpectrumView
                             android:id="@+id/home_bar_spectrum"
-                            android:layout_width="36dp"
+                            android:layout_width="match_parent"
                             android:layout_height="14dp"
-                            android:layout_gravity="start|center_vertical"
+                            android:layout_gravity="center"
                             android:visibility="gone" />
                     </FrameLayout>
                 </LinearLayout>
