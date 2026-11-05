@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「我的收藏」的心。
+
+     心和 ic_heart 是同一笔，但缩到 90%：那颗心的路径几乎铺满 24 格
+     （3.2 到 20.8），而侧栏上别的图标都留了一圈气。九项并排时，
+     只有这一颗心看着比旁人大一号。这里用 group 缩，不动 ic_heart——
+     播放页的收藏按钮要的就是那个满格的大小。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <group
+        android:pivotX="12"
+        android:pivotY="12"
+        android:scaleX="0.9"
+        android:scaleY="0.9">
+        <path
+            android:fillColor="#00000000"
+            android:pathData="M12,20.2C12,20.2 3.2,14.9 3.2,8.9C3.2,6.1 5.4,3.9 8.1,3.9C9.7,3.9 11.2,4.7 12,6C12.8,4.7 14.3,3.9 15.9,3.9C18.6,3.9 20.8,6.1 20.8,8.9C20.8,14.9 12,20.2 12,20.2Z"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="1.8" />
+    </group>
+</vector>

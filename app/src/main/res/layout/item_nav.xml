@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 侧栏一项。36dp 高：0.23.0 加进「推荐音乐 / 推荐 UP 主」之后是十一项，
+     36dp 会连带两个分组标题一起撑出 540dp 的屏，当时压到了 34dp。
+     0.25.0 起「推荐 UP 主」暂时下线，回到十项，36dp 又装得下了：
+     十项 × 36 = 360dp，两个分组标题各 21dp，合计 402dp，
+     侧栏可用高度约 424dp（540 − 底栏 62 − 上内边距 16 − 品牌位 38），留 22dp 余量。
+     再往上加目的地之前先重算这一行，别让最后一项掉出屏幕。
+
+     图标由代码按目的地塞进来（每一项不一样，写不进同一个 XML），这里只定位置：
+     图标与文字之间空 14dp——正好是 14sp 字号下一个汉字宽。 -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="36dp"
+    android:background="@drawable/bg_nav_item"
+    android:clickable="true"
+    android:drawablePadding="14dp"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:gravity="center_vertical"
+    android:paddingStart="14dp"
+    android:paddingEnd="12dp"
+    android:textColor="@color/nav_text"
+    android:textSize="14sp" />

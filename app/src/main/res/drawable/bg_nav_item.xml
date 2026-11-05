@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 导航项两级状态：选中（当前目的地）是一块常驻的浅底，聚焦是一块更亮的底 + 一道亮边。
+
+     原来用的是 #2E2E37 / #1C1C22 两个实色，色差三档——1080p、三米外，
+     这两个灰看着是同一个灰。现在两级都改成半透明白叠在模糊底上：
+     11% 是「我在这」，20% + 1.5dp 亮边是「光标在这」。
+
+     描边只在这一处用：侧栏九项同时只有一项被聚焦，屏幕上不会同时出现九个框。
+     列表那边二十行，仍然是只提亮不描边（见 bg_row）。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#33FFFFFF" />
+                    <corners android:radius="9dp" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <stroke
+                        android:width="1.5dp"
+                        android:color="#80FFFFFF" />
+                    <corners android:radius="9dp" />
+                    <solid android:color="@android:color/transparent" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#1CFFFFFF" />
+            <corners android:radius="9dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/transparent" />
+        </shape>
+    </item>
+</selector>

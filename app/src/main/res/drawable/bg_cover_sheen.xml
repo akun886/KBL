@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 封面顶沿的一道微光，18dp 高，20% 白渐隐到透明。
+
+     它不是装饰，是「这张图有厚度」的唯一线索：一条上沿亮的边读作受光的斜面，
+     一条均匀的边读作贴纸。三米的距离上只看得见这条亮线，看不见圆角。
+
+     圆角跟 bg_album / bg_cover_edge 的 12dp 对齐：三张图叠在同一张卡上，
+     圆角差 2dp 时上沿会露出一条毛边。首页的头图用的也是这一套。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners
+        android:topLeftRadius="12dp"
+        android:topRightRadius="12dp" />
+    <gradient
+        android:angle="270"
+        android:endColor="#00FFFFFF"
+        android:startColor="#33FFFFFF"
+        android:type="linear" />
+</shape>

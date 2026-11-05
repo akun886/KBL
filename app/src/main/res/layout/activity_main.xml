@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 应用根布局。从下往上：
+
+     1. 首页（home_stage）：左导航 + 歌单列表 + 底部播放条；
+     2. 播放页（overlay_now）：一屏一首歌，由底部条进入、返回键退出；
+     3. 浮层（搜索、我的、扫码登录）与临时提示。
+
+     首页与播放页是两条不同的主线，谁在上谁就接管按键（见 MainActivity.handleKey）——
+     没有页签，也没有常驻的底部导航：首页的侧栏就是导航。 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg">
+
+    <include layout="@layout/home_stage" />
+
+    <!-- 作者主页在播放页**之下**：从主页里点一首投稿会直接起播并打开播放页，
+         播放页必须盖住它。按返回键再从播放页退回主页时，作者主页原样还在。 -->
+    <include layout="@layout/overlay_space" />
+
+    <include layout="@layout/overlay_now" />
+
+    <include layout="@layout/panel_search" />
+
+    <include layout="@layout/panel_account" />
+
+    <include layout="@layout/overlay_fav_folder" />
+
+    <include layout="@layout/overlay_following" />
+
+    <include layout="@layout/overlay_login" />
+
+    <TextView
+        android:id="@+id/hint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="96dp"
+        android:background="@drawable/bg_pill_dark"
+        android:paddingStart="20dp"
+        android:paddingTop="9dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="9dp"
+        android:textColor="@color/text_primary"
+        android:textSize="15sp"
+        android:visibility="gone" />
+</FrameLayout>

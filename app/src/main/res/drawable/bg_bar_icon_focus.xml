@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 底栏图标键的焦点底板：玻璃方盒 + 一道亮边。
+
+     原来用的是播放页共用的 bg_icon_focus，聚焦只有 15% 的白块、没有边。
+     那一层压在深色底栏上只比底色亮十来个色阶（实测 #343538 对 #101215），
+     三米外根本看不出来——底栏在 0.22.0 之前不是焦点区，这一层弱没人发现；
+     现在整排五颗都是可选的控件，光标停在哪一颗必须一眼可见。
+
+     亮边取 1.5dp / 65%，是两头中间的一档：侧栏导航项是 1.5dp / 50%
+     （那一项有字，字本身够亮，边可以轻），播放键是 2dp / 80%（它是重心）。
+     纯图标的小方盒夹在中间，两头都不沾。
+
+     底色给到 22%，比播放键的常态（15%）高一档：全排任何时候只有一颗最亮，
+     那颗必须是光标所在。亮边是凑近了才分辨得出的信号，三米外能察觉的
+     只有整块底色的亮度差——所以底色也得分出一档。
+
+     单独建一份，不改 bg_icon_focus：那份是播放页的，播放页 0.21.0 定稿了，
+     不该被首页底栏的需求带着变。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#38FFFFFF" />
+                    <corners android:radius="12dp" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <stroke
+                        android:width="1.5dp"
+                        android:color="#A6FFFFFF" />
+                    <corners android:radius="12dp" />
+                    <solid android:color="@android:color/transparent" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@android:color/transparent" />
+            <corners android:radius="12dp" />
+        </shape>
+    </item>
+</selector>

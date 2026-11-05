@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 推荐 UP 主：一支麦克风。
+     不用「两个人」——那是已经有的「关注」；这里的区别不在「人多」，
+     而在「这些人是出歌的人」，麦克风才说得清 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M12,3.2 A2.9,2.9 0 0,1 14.9,6.1 L14.9,10.6 A2.9,2.9 0 0,1 9.1,10.6 L9.1,6.1 A2.9,2.9 0 0,1 12,3.2 Z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineJoin="round"
+        android:strokeWidth="1.8" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M6.2,10.4 A5.8,5.8 0 0,0 17.8,10.4"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="1.8" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M12,16.2 L12,20.4 M9.2,20.6 L14.8,20.6"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="1.8" />
+</vector>

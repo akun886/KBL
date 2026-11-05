@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 头像的圆形底。
+     只做两件事：给 ImageView 一个可裁剪的轮廓（clipToOutline 需要背景是 shape），
+     以及在头像还没到时垫一层深色，避免出现一个白洞 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#1FFFFFFF" />
+</shape>

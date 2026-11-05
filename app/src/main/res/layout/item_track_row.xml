@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 歌单里的一行。列是「序号 / 歌名 / 歌手 / 时长」，一列一列对齐。
+
+     列宽与 home_stage.xml 的列头一一对应，改一处就要改另一处。
+     歌名独占剩下的宽度：列表里唯一需要读全的是歌名，歌手和时长只是用来
+     排除「同名不同人」和「是不是一整张专辑」的。
+
+     采集指标（播放量、弹幕数、收藏数）一个都不放——那是帮人决定「点不点」的，
+     在听歌场景里它不参与决定。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/row_root"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:background="@drawable/bg_row"
+    android:clickable="true"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp">
+
+    <View
+        android:id="@+id/row_sel"
+        android:layout_width="3dp"
+        android:layout_height="26dp"
+        android:layout_marginEnd="11dp"
+        android:background="@color/accent"
+        android:visibility="invisible" />
+
+    <TextView
+        android:id="@+id/row_index"
+        android:layout_width="28dp"
+        android:layout_height="wrap_content"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/row_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/text_primary"
+        android:textSize="16sp" />
+
+    <!-- 合集角标。一条记录背后是一百首，不标出来就成了「只有这一首」。
+         P 数只有接口给的时候才写得出来（最新发布 / 历史带 videos），
+         音乐区推荐流和综合榜不给——那两处的合集要播过一次、落过缓存才有数字 -->
+    <TextView
+        android:id="@+id/row_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:background="@drawable/bg_badge"
+        android:paddingStart="7dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="7dp"
+        android:paddingBottom="2dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+    <!-- 已收藏。实心红心，14dp，紧贴歌名后面而不是贴在行尾：
+         行尾那一列是时长，把心放在那里会被读成「这首歌多长，还带个心」。
+         只给图标不给文字——一屏二十行，二十个「已收藏」会把歌名压成配角 -->
+    <ImageView
+        android:id="@+id/row_fav"
+        android:layout_width="15dp"
+        android:layout_height="15dp"
+        android:layout_marginStart="8dp"
+        android:contentDescription="@null"
+        android:src="@drawable/ic_heart_on"
+        android:visibility="gone" />
+
+    <!-- 歌手列是能点的：光标移过去按确认，进这个 UP 主的主页。
+         一列二十行行行都是一串名字，能点进去才知道那是谁。 -->
+    <TextView
+        android:id="@+id/row_artist"
+        android:layout_width="190dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:background="@drawable/bg_icon_focus"
+        android:clickable="true"
+        android:ellipsize="end"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:maxLines="1"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
+
+    <!-- 正在播的那一首，在歌手与时长之间跳几根小柱子。
+         它不接音频：这一行要说的是「就是这首」，不是「此刻这个鼓点」。
+         跟着音乐跳反而会在一列静止的歌名里抢走注意力，而且一屏二十行都要算一遍频谱也不值。 -->
+    <com.kunplayer.tv.ui.SpectrumView
+        android:id="@+id/row_spectrum"
+        android:layout_width="24dp"
+        android:layout_height="14dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="4dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/row_dur"
+        android:layout_width="56dp"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp" />
+</LinearLayout>

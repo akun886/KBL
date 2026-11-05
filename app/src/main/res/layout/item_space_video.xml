@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 作者主页里的一条投稿：歌名 + 收藏心 + 时长。
+
+     行本身点了就播，心点了就收藏——两个动作放在两个地方，
+     不做成「点一下先播、再点一下收藏」的那种猜谜。
+     心是独立的焦点位：收藏是这一页唯一的写操作，不能藏在长按里。
+
+     行与心之间织一条显式的网：行 ⇄ 心。
+     FocusFinder 的几何搜索找不到「焦点视图内部的子控件」，
+     光标停在行上时按右键不会走到心，只能靠 nextFocus 织。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/space_video_row"
+    android:layout_width="match_parent"
+    android:layout_height="44dp"
+    android:background="@drawable/bg_row"
+    android:clickable="true"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:gravity="center_vertical"
+    android:nextFocusRight="@id/space_video_fav"
+    android:orientation="horizontal"
+    android:paddingStart="10dp"
+    android:paddingEnd="10dp">
+
+    <TextView
+        android:id="@+id/space_video_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/text_primary"
+        android:textSize="15sp" />
+
+    <ImageView
+        android:id="@+id/space_video_fav"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:background="@drawable/bg_icon_focus"
+        android:clickable="true"
+        android:contentDescription="@string/now_fav"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:nextFocusLeft="@id/space_video_row"
+        android:padding="8dp"
+        android:src="@drawable/ic_heart"
+        android:tint="@color/text_secondary" />
+
+    <TextView
+        android:id="@+id/space_video_dur"
+        android:layout_width="52dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:gravity="end"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp" />
+</LinearLayout>

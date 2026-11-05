@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 进度条的焦点底板。默认全透明（视觉上只有那条 4dp 的线），聚焦时浮出一层极淡的
+     圆角高亮：不靠颜色变化，而是靠「这整条都是可操作区域」这件事变得可见。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape>
+            <solid android:color="#14FFFFFF" />
+            <corners android:radius="13dp" />
+        </shape>
+    </item>
+    <item android:drawable="@android:color/transparent" />
+</selector>

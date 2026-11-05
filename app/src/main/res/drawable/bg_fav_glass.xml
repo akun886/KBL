@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 收藏键的底。它不再压在封面图上（新版把歌名与收藏一起搬到了图下面），
+     所以那层 25% 黑圆没有存在理由了——背景本来就是页面底色。
+
+     平时完全透明，只在聚焦时浮出一层 20% 白圆：图标是白的，垫实白会看不出形状，
+     只垫一层底。焦点同时靠 NowPlaying 里放大 1.08 表示。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="oval">
+            <solid android:color="#33FFFFFF" />
+        </shape>
+    </item>
+    <item android:drawable="@android:color/transparent" />
+</selector>

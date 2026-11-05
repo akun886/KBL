@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 搜索页：左栏键盘 + 历史，右栏结果。和首页是同一个骨架（左窄右宽 + 一条 1dp 分栏线）。
+
+     为什么从「上结果下键盘」翻过来：
+       竖排的结果区只有四百多 dp 高，键盘一占，一屏看得见三行歌——搜完还得先滚一遍。
+       键盘挪到左边只吃掉 400dp 宽，换回来的是整屏高度。而九宫格横着摆本来就不需要宽，
+       一行三个键，横向最远只按两次。
+
+     400dp 左栏是按内容反推的：三格键 + 两处 5dp 间距 + 两侧 14dp 内边距 = 360dp 起，
+     再给「空格/删除/搜索/清空」那四颗各留出余量，400 是能塞下又不挤的数。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/search_panel"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:orientation="horizontal"
+    android:visibility="gone">
+
+    <!-- 左栏：输入回显 + 历史 + 九宫格 -->
+    <LinearLayout
+        android:layout_width="400dp"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_sidebar"
+        android:orientation="vertical"
+        android:paddingStart="14dp"
+        android:paddingTop="18dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="14dp">
+
+        <!-- 输入回显。空的时候是占位提示（灰色），有字时白色 -->
+        <TextView
+            android:id="@+id/search_field"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:paddingStart="4dp"
+            android:paddingBottom="6dp"
+            android:textColor="@color/text_primary"
+            android:textSize="21sp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/hairline" />
+
+        <!-- 历史区的标题。放在 ScrollView 外面：跟着一起滚的话，往下翻几条之后
+             顶部就剩半截卡片，看不出这一列是什么 -->
+        <TextView
+            android:id="@+id/search_hist_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="6dp"
+            android:text="@string/search_hist"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <!-- 搜索历史。由 MainActivity 在打开时按需铺，没有历史整块 gone。
+             外面这层 ScrollView 是为了「存得比看得见的多」：左栏固定高度只装得下五行，
+             文件里留十条，多出来的靠这里翻——不给它滚动，第六条往后就永远见不到，
+             等于没存。高度由代码按实际条数给（最多五行），不给死值，
+             否则两条历史也占满一屏，键盘被顶下去。
+             focusable=false + afterDescendants：滚动本身不接焦点，
+             焦点始终落在某一条历史上，不然会先停在 ScrollView 这个没有高亮的空层里。 -->
+        <ScrollView
+            android:id="@+id/search_hist_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:descendantFocusability="afterDescendants"
+            android:focusable="false"
+            android:overScrollMode="never"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/search_hist_box"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </ScrollView>
+
+        <!-- 九宫格键盘。键在第一次进这一页时才铺（Keypad.ensureBuilt）。
+             外面这层 FrameLayout 是给「按一格、弹该格字母」那张卡片留的位置：
+             卡片要浮在键盘之上、又不能让键盘让位，只有叠层做得到。
+             Keypad 通过 container.parent 找它，换成普通 LinearLayout 就弹不出来 -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp">
+
+            <LinearLayout
+                android:id="@+id/keypad"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <View
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:background="@color/hairline" />
+
+    <!-- 右栏：结果 -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingStart="28dp"
+        android:paddingTop="20dp"
+        android:paddingEnd="36dp"
+        android:paddingBottom="16dp">
+
+        <TextView
+            android:id="@+id/search_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/search_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:overScrollMode="never"
+            android:scrollbars="none" />
+    </LinearLayout>
+</LinearLayout>

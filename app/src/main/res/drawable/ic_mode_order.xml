@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 顺序播放：两条首尾相接的箭头，读作「放完这首接下一首」。
+     用实心而不是描边，是为了跟同一排的前进/后退/播放键一个手感——
+     那一排全是实心块，混一个 1.8 描边进去会显得轻一档。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7,7h10v3l4,-4l-4,-4v3H5v6h2V7z M17,17H7v-3l-4,4l4,4v-3h12v-6h-2v4z" />
+</vector>

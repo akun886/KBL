@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 流行：一条上扬的折线加箭头，不是火焰。
+
+     最早画的是火焰（外焰 + 内焰），在 18dp 上渲染出来就是一颗水滴——
+     火焰的辨识度全靠顶上那道 S 弯和内焰，这两样在 36 个像素里都留不住。
+     折线加箭头在同样尺寸下第一眼就能读出来，而且「热门」本来就等于
+     「趋势往上」，不是「烧起来了」。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M3.4,17.4 L9.2,11.4 L12.6,14.8 L20.6,6.6 M15.4,6.6 L20.6,6.6 L20.6,11.8"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="1.8" />
+</vector>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 合集角标：一个描边的小胶囊，不用实心底。
+     实心会在每一条合集行上留下一块高亮，而「这是合集」只是补充信息，
+     不该比歌名更显眼。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#1FFFFFFF" />
+    <corners android:radius="9dp" />
+</shape>

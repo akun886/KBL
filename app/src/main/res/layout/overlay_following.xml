@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 关注列表。侧栏「关注」点进来就是这一页。
+
+     一屏只列人：点谁就进谁的主页，主页里再听他的歌。
+     在这里就把他的歌铺出来会变成另一张歌单，两处都摆就分不清
+     「关注列表」和「播放历史」到底差在哪。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/following_panel"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:orientation="vertical"
+    android:paddingStart="56dp"
+    android:paddingTop="26dp"
+    android:paddingEnd="56dp"
+    android:paddingBottom="20dp"
+    android:visibility="gone">
+
+    <TextView
+        android:id="@+id/following_heading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-medium"
+        android:text="@string/follow_title"
+        android:textColor="@color/text_primary"
+        android:textSize="24sp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="10dp"
+        android:background="@color/hairline" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/following_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="8dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:overScrollMode="never"
+        android:scrollbars="none" />
+
+    <TextView
+        android:id="@+id/following_note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
+</LinearLayout>

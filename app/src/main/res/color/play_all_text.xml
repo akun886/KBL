@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「播放全部」的字色。
+
+     原来是「聚焦变黑字」——底翻成实白，字得跟着反色。现在底是玻璃（bg_play_all），
+     聚焦只是更亮一档并加一道边，字一直是白的。留成单色是为了别处复用这个
+     状态色时不会突然变黑。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/text_primary" />
+</selector>

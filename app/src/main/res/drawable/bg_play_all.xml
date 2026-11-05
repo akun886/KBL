@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「播放全部」：玻璃胶囊，跟播放页那颗 84×44 的播放键同一种材质（bg_play_glass）。
+
+     原来聚焦是翻成实心纯白 + 黑字。那样一个纯白块压在一列歌名上方，视线会先落在
+     它身上而不是歌名——播放页早就把实白换成 20% 玻璃了，这里跟上。
+     焦点靠「20% → 30% + 2dp 亮边」表达：半透明块只调透明度看不出来，
+     必须有一条能一眼看到的边。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#4DFFFFFF" />
+            <stroke
+                android:width="2dp"
+                android:color="#CCFFFFFF" />
+            <corners android:radius="17dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#2BFFFFFF" />
+            <corners android:radius="17dp" />
+        </shape>
+    </item>
+</selector>

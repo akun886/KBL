@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 封面模糊后压上去的遮罩。
+
+     底色 #17171A 只能是「还没画完」的样子，真正的底色应该是这张封面自己。
+     所以遮罩从「整块均匀压到接近底色」改成横向渐变：左边压到 92%（左栏的
+     歌名、时间、控制键都压在这上面，不能有光斑），右边放到 60%，
+     让封面的颜色从这里透出来。两边差 30%，读起来就是「光从封面那边来」。
+
+     配上 player_bg 的 0.75 alpha，右半个屏幕最终能透出约三成的封面色。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="0"
+        android:endColor="#99171A1E"
+        android:startColor="#EB17171A"
+        android:type="linear" />
+</shape>
+

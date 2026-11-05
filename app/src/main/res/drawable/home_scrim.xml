@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 首页的背景遮罩。和播放页的 now_scrim 是一套做法，但压得更实。
+
+     播放页只有一张封面和一列歌词，右半屏可以放到 60%。首页右半屏是五行歌名、
+     歌手、时长，字比歌词小一半，底色再亮一点就读不清了——所以整屏压在 72%～80%，
+     只留一成多的封面色透出来。听的是哪张歌单，整页就带一点它的颜色，
+     但绝不跟字抢对比度。
+
+     左边比右边再暗 8%：侧栏里的字是 14sp 的九项导航，比列表还小，且底色是
+     全屏最暗的一块。渐变方向跟播放页相反（那边光从右来，因为内容在左）——
+     这里内容满铺，只在左缘压一道暗，是为了让侧栏那块自成一体。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="0"
+        android:endColor="#B317171A"
+        android:startColor="#CC121215"
+        android:type="linear" />
+</shape>

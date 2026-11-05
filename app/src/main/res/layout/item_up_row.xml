@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 推荐 UP 主的一行：头像 / 名字 / 出了几首 / 已关注。
+
+     和曲目行（item_track_row）不是同一张表：这里没有序号、没有时长，
+     所以首页那份列头在这一页会隐藏——列头对不上表格比没有列头更糟。
+
+     「几首」放在名字右边而不是塞进名字后面的括号里：括号里的字读起来像
+     名字的一部分，而它其实是排序依据，也是「值不值得点进去」的唯一线索。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/up_root"
+    android:layout_width="match_parent"
+    android:layout_height="56dp"
+    android:background="@drawable/bg_row"
+    android:clickable="true"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp">
+
+    <View
+        android:id="@+id/up_sel"
+        android:layout_width="3dp"
+        android:layout_height="24dp"
+        android:layout_marginEnd="11dp"
+        android:background="@color/accent"
+        android:visibility="invisible" />
+
+    <ImageView
+        android:id="@+id/up_face"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/bg_avatar"
+        android:clipToOutline="true"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop" />
+
+    <TextView
+        android:id="@+id/up_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/text_primary"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/up_songs"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
+
+    <!-- 已关注：实心一点的胶囊。它回答的是「这个人我已经收过了」，
+         在推荐页上是「跳过还是点进去」的依据，值得比「几首」更亮 -->
+    <TextView
+        android:id="@+id/up_followed"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:background="@drawable/bg_badge"
+        android:paddingStart="9dp"
+        android:paddingTop="3dp"
+        android:paddingEnd="9dp"
+        android:paddingBottom="3dp"
+        android:text="@string/up_badge_followed"
+        android:textColor="@color/text_primary"
+        android:textSize="11sp"
+        android:visibility="gone" />
+</LinearLayout>

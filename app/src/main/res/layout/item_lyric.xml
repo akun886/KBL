@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 一行歌词。字号固定：当前行只换颜色和字重，不改字号——
+     一改字号就改行高，居中位置跟着抖，而歌词是整屏唯一在动的东西。
+
+     每句居中而不是左对齐：歌词是短句，一行就是一句，居中后整块有一个竖轴，
+     读的时候眼睛不用横着找起点。标题那种三十几个字的长句才需要左对齐。 -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/lyric_text"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:ellipsize="end"
+    android:gravity="center_horizontal"
+    android:lineSpacingMultiplier="1.16"
+    android:maxLines="2"
+    android:paddingTop="5dp"
+    android:paddingBottom="5dp"
+    android:textColor="@color/text_secondary"
+    android:textSize="22sp" />

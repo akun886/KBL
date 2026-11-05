@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 底栏的播放键。跟播放页那份 bg_play_glass 分开。
+
+     播放页的胶囊常态就是 20% 的白——那一页只有一颗，它是整页唯一的重心，
+     亮得理所当然。底栏这一排有五颗键，都一样亮的话，「亮的那颗」就不再
+     代表焦点：用户看到的重心和光标所在成了两件事，按下去之前得先找一遍。
+
+     所以底栏常态压到 15%（比裸图标多一点重量，不抢戏），聚焦时 30% + 2dp
+     亮边，一按上去立刻是全排最亮的那颗。全排任何时候只有一颗最亮，
+     那颗就是光标。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="22dp" />
+            <solid android:color="#4DFFFFFF" />
+            <stroke
+                android:width="2dp"
+                android:color="#CCFFFFFF" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="22dp" />
+            <solid android:color="#26FFFFFF" />
+        </shape>
+    </item>
+</selector>

@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 桌面图标下、侧栏品牌位、系统设置里的应用名，都读这一条 -->
+    <string name="app_name">B站音乐TV版</string>
+
+    <string name="nav_discover">发现</string>
+    <string name="nav_search">搜索</string>
+    <string name="nav_account">我的</string>
+
+    <!-- 首页侧栏 -->
+    <string name="nav_music">音乐</string>
+    <string name="nav_rec_music">推荐音乐</string>
+    <string name="nav_rec_up">推荐 UP 主</string>
+    <string name="nav_queue">正在收听</string>
+    <string name="nav_pop">流行</string>
+    <string name="nav_new">最新发布</string>
+    <string name="nav_fav">我的收藏</string>
+    <string name="nav_follow">关注</string>
+    <string name="nav_hist">播放历史</string>
+    <string name="nav_group_mine">我的音乐</string>
+    <string name="nav_group_more">更多</string>
+
+    <string name="home_title_music">音乐</string>
+    <string name="home_title_rec_music">推荐音乐</string>
+    <string name="home_title_rec_up">推荐 UP 主</string>
+    <string name="home_title_queue">正在收听</string>
+    <string name="home_title_pop">流行</string>
+    <string name="home_title_new">最新发布</string>
+    <string name="home_title_fav">我的收藏</string>
+    <string name="home_title_follow">关注</string>
+    <string name="home_title_hist">播放历史</string>
+
+    <!-- 页头副标题只在承载「布局说不出的约束」时才存在（AGENTS.md Design & Copy Rules）。
+         这两条是真约束：推荐池怎么捞、推荐 UP 按什么排。别的页「播放器队列」「最近听过」
+         这类复述标题的句子已经删掉——标题自己就说明那一页是什么。 -->
+    <string name="home_sub_rec_music">随机关键词 · 一小时以上</string>
+    <string name="home_sub_rec_up">按在推荐池里的曲数排</string>
+
+    <string name="home_play_all">播放全部</string>
+    <!-- 「换一批」那颗圆钮：界面上没有字，这条只给读屏和日志用 -->
+    <string name="home_refresh">换一批</string>
+    <string name="home_refresh_failed">这批没换成，再按一次</string>
+    <string name="home_count">%1$d 首</string>
+    <string name="home_count_up">%1$d 位</string>
+    <!-- 推荐 UP 主行上的两处：出了几首、我有没有关注 -->
+    <string name="up_song_count">%1$d 首</string>
+    <string name="up_badge_followed">已关注</string>
+    <string name="home_loading">加载中…</string>
+    <string name="home_empty">没有拉到歌，检查网络后再试</string>
+    <string name="home_col_index">#</string>
+    <string name="home_col_song">歌名</string>
+    <string name="home_col_artist">歌手</string>
+    <string name="home_col_dur">时长</string>
+
+    <string name="home_bar_empty">还没有在播放的歌</string>
+    <string name="home_mode_now">播放模式：%1$s</string>
+
+    <string name="fav_empty">还没有收藏。在歌曲上按 MENU 键收藏</string>
+    <string name="fav_added">已加入收藏</string>
+    <string name="fav_removed">已取消收藏</string>
+    <string name="fav_need_login">登录后显示云端收藏夹</string>
+    <string name="fav_cloud_empty">云端收藏夹是空的</string>
+    <string name="fav_failed">收藏失败，检查网络后再试</string>
+
+    <!-- 收藏夹管理 -->
+    <string name="fav_new_folder">新建收藏夹</string>
+    <string name="fav_del_folder">删除收藏夹</string>
+    <string name="fav_folder_new_title">新建收藏夹</string>
+    <string name="fav_folder_del_title">删除收藏夹</string>
+    <string name="fav_folder_hint">起个名字，用字母</string>
+    <string name="fav_folder_ok">确定</string>
+    <string name="fav_folder_cancel">取消</string>
+    <string name="fav_folder_created">已建收藏夹《%1$s》</string>
+    <string name="fav_folder_deleted">已删收藏夹《%1$s》</string>
+    <string name="fav_folder_confirm">再按一次确认删除《%1$s》</string>
+    <string name="fav_folder_failed">操作失败：%1$s</string>
+    <string name="fav_folder_default">默认收藏夹</string>
+    <string name="fav_folder_locked">不可删除</string>
+    <string name="fav_folder_count">%1$d 首</string>
+
+    <!-- 关注 -->
+    <string name="follow_need_login">登录后显示关注列表</string>
+    <string name="follow_empty">还没有关注任何人</string>
+    <string name="follow_failed">关注列表拉取失败</string>
+    <string name="follow_title">关注</string>
+
+    <!-- 作者主页 -->
+    <string name="space_follow">关注</string>
+    <string name="space_followed">已关注</string>
+    <string name="space_unfollow">取消关注</string>
+    <string name="space_videos">投稿</string>
+    <string name="space_no_video">TA 还没有投稿</string>
+    <string name="space_failed">作者主页打不开</string>
+    <string name="space_level">Lv%1$d</string>
+    <string name="space_notice">%1$s · %2$s</string>
+    <string name="space_no_mid">这个来源没给作者 id，进不了主页</string>
+    <string name="space_finding">正在找这位 UP 主…</string>
+
+    <string name="search_placeholder">输入拼音搜索</string>
+    <string name="search_empty">没有找到相关歌曲</string>
+    <string name="search_none">输入拼音开始搜索</string>
+    <string name="search_failed">搜索失败，换个词再试</string>
+    <!-- 左栏历史区的标题。只在有历史时出现 -->
+    <string name="search_hist">最近搜过</string>
+    <string name="search_clear">清空</string>
+
+    <string name="history_need_login">登录后显示播放历史</string>
+    <string name="history_empty">还没有播放记录</string>
+    <string name="history_failed">历史拉取失败</string>
+
+    <string name="account_guest">未登录</string>
+    <string name="account_guest_sub">登录后可同步收藏、播放历史，并解锁无损音轨</string>
+    <string name="account_login">扫码登录</string>
+    <string name="account_logout">退出登录</string>
+    <string name="account_logged_sub">收藏与播放历史已与 App 同步</string>
+    <string name="account_logout_done">已退出登录</string>
+    <!-- 应用名 + 版本名 + 构建号。「我的」页脚用，注意空格与括号都是排版的一部分 -->
+    <string name="account_version">%1$s %2$s (%3$d)</string>
+
+    <string name="login_title">扫码登录</string>
+    <string name="login_hint">打开「哔哩哔哩」App，用左上角扫一扫</string>
+    <string name="login_wait">正在获取二维码…</string>
+    <string name="login_scan">请用手机扫描二维码</string>
+    <string name="login_scanned">已扫码，请在手机上确认</string>
+    <string name="login_expired">二维码已过期，正在刷新…</string>
+    <string name="login_ok">已登录：%s</string>
+    <string name="login_failed">登录失败：%s</string>
+
+    <string name="home_offline">连不上 B 站，按 MENU 重试</string>
+
+    <string name="bar_prev">上一首</string>
+    <string name="bar_play">播放或暂停</string>
+    <string name="bar_next">下一首</string>
+    <string name="bar_mode">播放模式</string>
+
+    <string name="now_playing">正在播放</string>
+    <!-- 前台服务通知频道名，见 PlaybackService -->
+    <string name="now_channel">正在播放</string>
+    <string name="now_fav">收藏</string>
+    <string name="mode_order">顺序</string>
+    <string name="mode_one">单曲</string>
+    <string name="mode_shuffle">随机</string>
+    <string name="now_nothing">还没有在播放的歌</string>
+    <string name="now_nothing_hint">回首页挑一首</string>
+    <string name="now_seek">进度 · 左右键快退快进</string>
+    <!-- 下一首预告。只有「顺序」模式才画：单曲循环的下一首就是它自己，
+         随机的下一首没法预告，写了都是骗人的 -->
+    <string name="now_up_next">下一首 · %1$s</string>
+    <string name="now_keys">方向键 移动光标　确认 执行光标上的图标　进度条上左右 快进快退</string>
+    <string name="now_lyrics_none">暂无歌词</string>
+    <string name="now_lyrics_no_sub">B 站没有为这首歌提供字幕</string>
+    <string name="now_lyrics_not_lyric">字幕内容不像是歌词，已隐藏</string>
+    <string name="now_lyrics_net">歌词加载失败</string>
+    <string name="now_lyrics_need_login">登录后显示歌词</string>
+    <string name="now_list_title">播放列表</string>
+    <string name="now_list_count">共 %1$d 首</string>
+    <string name="now_list_open">播放列表</string>
+    <string name="now_list_close">收起播放列表</string>
+    <string name="home_badge_album">合集 %1$d 首</string>
+    <string name="player_cover_desc">专辑封面</string>
+
+    <string name="account_crash">异常记录 %1$d 份 · 按 MENU 清除</string>
+    <string name="account_crash_cleared">异常记录已清除</string>
+
+    <!-- 播放设置。四项，都在「我的」页里，一行一项 -->
+    <string name="settings_title">播放设置</string>
+    <string name="settings_style">频谱样式</string>
+    <string name="settings_color">频谱颜色</string>
+    <string name="settings_normalize">响度均衡</string>
+    <string name="settings_background">返回桌面后继续播放</string>
+    <string name="settings_on">开</string>
+    <string name="settings_off">关</string>
+    <string name="spectrum_bars">柱状</string>
+    <string name="spectrum_wave">波形</string>
+    <string name="spectrum_ring">环形</string>
+    <string name="color_cyan">青</string>
+    <string name="color_violet">紫</string>
+    <string name="color_amber">橙</string>
+    <string name="color_green">绿</string>
+    <string name="color_pink">粉</string>
+    <string name="color_white">白</string>
+
+    <!-- 按返回键退出应用时的一次确认。电视上没有「关闭」按钮，返回键就是唯一出口，
+         直接退太容易误触，问第二次是最轻的拦截 -->
+    <string name="exit_confirm">再按一次返回键退出应用</string>
+
+    <string name="probe_title">B站音乐TV版 链路自检</string>
+    <string name="probe_subtitle">小米电视4A · Android 6.0.1 · 探针版</string>
+    <string name="probe_start">开始自检</string>
+    <string name="probe_hint">按 OK 开始。依次验证：buvis 指纹 → 视频信息 → playurl → 音轨出声</string>
+</resources>

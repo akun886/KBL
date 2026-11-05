@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 收藏夹管理。两个模式共用一页：
+     「新建收藏夹」是输入，「删除收藏夹」是挑一个夹子删掉。
+
+     新建靠自绘键盘，不用系统输入法：这台机器的系统 IME 被裁得只剩框架，
+     弹出来也不会响应方向键。键只有 a-z，B 站的收藏夹名本来就常是英文单词。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/fav_folder_panel"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:orientation="vertical"
+    android:paddingStart="56dp"
+    android:paddingTop="26dp"
+    android:paddingEnd="56dp"
+    android:paddingBottom="20dp"
+    android:visibility="gone">
+
+    <TextView
+        android:id="@+id/fav_folder_heading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-medium"
+        android:textColor="@color/text_primary"
+        android:textSize="24sp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="10dp"
+        android:background="@color/hairline" />
+
+    <!-- 新建 -->
+    <LinearLayout
+        android:id="@+id/fav_folder_create"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/fav_folder_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textColor="@color/text_primary"
+            android:textSize="26sp" />
+
+        <!-- 外面这层是给「按一格弹字母」的卡片留的叠层位置，原因同 panel_search -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp">
+
+            <LinearLayout
+                android:id="@+id/fav_folder_keys"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/fav_folder_ok"
+                android:layout_width="wrap_content"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_pill_play"
+                android:clickable="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:paddingStart="34dp"
+                android:paddingEnd="34dp"
+                android:text="@string/fav_folder_ok"
+                android:textColor="#FF000000"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/fav_folder_cancel"
+                android:layout_width="wrap_content"
+                android:layout_height="42dp"
+                android:layout_marginStart="16dp"
+                android:background="@drawable/bg_pill_dark"
+                android:clickable="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center"
+                android:paddingStart="34dp"
+                android:paddingEnd="34dp"
+                android:text="@string/fav_folder_cancel"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 删除 -->
+    <LinearLayout
+        android:id="@+id/fav_folder_del"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/fav_folder_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:overScrollMode="never"
+            android:scrollbars="none" />
+
+        <TextView
+            android:id="@+id/fav_folder_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/fav_folder_del_cancel"
+            android:layout_width="wrap_content"
+            android:layout_height="42dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_pill_dark"
+            android:clickable="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:gravity="center"
+            android:paddingStart="34dp"
+            android:paddingEnd="34dp"
+            android:text="@string/fav_folder_cancel"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp" />
+    </LinearLayout>
+</LinearLayout>

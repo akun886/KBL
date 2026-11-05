@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 图标键的着色。
+
+     原来聚焦时翻成深色（@color/bg）——那套配的是「聚焦变实心白底、深色图标」。
+     现在图标键的焦点态是一层 15% 的白玻璃（bg_icon_focus），图标再翻深色
+     就等于在灰底上画灰图。播放页和首页底栏共用这一份，两边一起改。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/text_primary" />
+</selector>

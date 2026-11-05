@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 封面那道亮边。
+     深底（#17171A）上黑色投影没有对比度，elevation 只会让图看起来发灰，
+     所以「浮起来」这件事只能靠一道受光的边——白天从窗户看玻璃，先看到的是边。
+
+     描边以轮廓线为中心向两侧各画一半，外半边会被 clipToOutline 裁掉，
+     2dp 进去刚好剩 1dp。封面缩到 315 宽之后这 2dp 没跟着降：1.5dp 裁完只剩
+     0.75dp，1080p 上就是 1.5 个像素，缩放动画一动就闪。这条边是常驻的，
+     宁可略重，也不能在动的时候断。圆角跟 bg_album 保持一致。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="12dp" />
+    <stroke
+        android:width="2dp"
+        android:color="@color/cover_edge" />
+    <solid android:color="@android:color/transparent" />
+</shape>

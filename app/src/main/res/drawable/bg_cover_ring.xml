@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 封面聚焦时浮在卡外 10dp 的一道环。
+
+     为什么不能只靠「把卡边提亮」：卡边是画在图上面的，浅色封面（白底海报、
+     亮蓝天、粉色 MV 剧照）本身比它亮，提亮等于没提——真机上拿周深那张粉色封面
+     逐像素比过，聚焦前后边缘只差 3 个色阶，等于没有反馈。
+     环浮在页面底色上，跟封面什么颜色无关，任何一张图都成立。
+
+     2dp、60% 白、圆角 22dp（卡的 12dp + 间隙 10dp）：读作「这张被选中了」，
+     而不是给封面镶了个边框。卡聚焦时自己会放大 2%，所以间隙要给到 10dp——
+     按 8dp 做的时候，放大后只剩 4dp，环几乎贴在卡上，看起来像双线框。
+     卡上那道常驻亮边在聚焦时不再提亮：有了环再提亮就是「框里还有框」。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="22dp" />
+    <stroke
+        android:width="2dp"
+        android:color="#99FFFFFF" />
+    <solid android:color="@android:color/transparent" />
+</shape>

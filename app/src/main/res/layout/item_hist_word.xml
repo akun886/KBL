@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 一条搜索历史。左栏里的一行，点一下就把这个词再搜一次。
+
+     为什么是胶囊 + 右箭头而不是纯文字：纯文字在深底上看起来像标题，
+     不像能按的东西。箭头是「这一行能执行」的记号——
+     37dp 高也是按「一行 14sp 字 + 上下 11dp 呼吸」算的，和键盘键 52dp 拉开层级 -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="37dp"
+    android:background="@drawable/bg_hist_chip"
+    android:clickable="true"
+    android:drawableEnd="@drawable/ic_chevron"
+    android:drawablePadding="8dp"
+    android:ellipsize="end"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:gravity="center_vertical"
+    android:maxLines="1"
+    android:paddingStart="12dp"
+    android:paddingEnd="10dp"
+    android:textColor="@color/text_primary"
+    android:textSize="14sp" />

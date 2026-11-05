@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 播放键的底：胶囊，不再是圆。
+
+     参考图里这颗键是横向拉的胶囊（约 2:1），比圆更像「播放/暂停」这个动词的
+     容器，也让它在五颗键里天然是中心。84×44、圆角 22 = 高度的一半。
+
+     20% 半透明白：一块纯白实心会把封面压成配角，整页出现第二个视觉重心。
+     焦点态加一圈亮边并整体提到 30%——半透明块靠调透明度变化不明显，
+     得有一条能一眼看到的边。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="22dp" />
+            <solid android:color="#4DFFFFFF" />
+            <stroke
+                android:width="2dp"
+                android:color="#CCFFFFFF" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="22dp" />
+            <solid android:color="#33FFFFFF" />
+        </shape>
+    </item>
+</selector>

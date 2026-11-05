@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 底栏封面框。
+
+     和 bg_album 分开：bg_album 被播放页封面、头像等六处共用，
+     在它上面加聚焦描边会把播放页的封面也框起来——
+     而播放页的封面恰恰是「不留焦点环」的设计（AGENTS.md 里写着）。
+     底栏这个封面是「封面上的小播放键」那个焦点位，不给焦点态的话，
+     光标停在它上面和停在别处长得一模一样，用户按了确认不知道在按什么。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="8dp" />
+            <solid android:color="@color/surface" />
+            <stroke
+                android:width="2dp"
+                android:color="#66FFFFFF" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="8dp" />
+            <solid android:color="@color/surface" />
+        </shape>
+    </item>
+</selector>

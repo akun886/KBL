@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 只为给 clipToOutline 提供一个圆角轮廓：封面按 16:9 显示后靠它切圆角，
+     比每张图重绘圆角遮罩便宜得多。
+
+     12dp：封面缩到 315×177（满栏的 3/4）之后，原来配 420 宽的 14dp 在同比例下
+     应该跟着降到 10.5，取 12 是因为再小就切不出圆角，只剩「刮了个角」。
+     更往上的 16/20 在这张卡上开始像胶囊，一张实拍封面撑不住。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="12dp" />
+    <solid android:color="@color/surface" />
+</shape>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深灰而不是纯黑：纯黑会让居中排版的这张页面显得「还没画完」，
+         抬到 #17171A 才看得出封面和底之间有一层空气 -->
+    <color name="bg">#FF17171A</color>
+    <color name="surface">#FF1F1F23</color>
+    <color name="hairline">#FF2A2A2F</color>
+
+    <!-- 首页侧栏比正文再压暗一档：两栏之间不放分割线，靠底色差分开。
+         一条 1dp 竖线在 1080p 的电视上会细到看不见，反倒显得像渲染缺陷 -->
+    <color name="sidebar">#FF121215</color>
+    <color name="bar_bg">#FF101013</color>
+
+    <!-- 进度条走白，红色只留给「已收藏」的心。一条红进度条会把封面压成配角 -->
+    <color name="seek_fill">#FFF2F2F5</color>
+    <color name="seek_track">#FF3A3A40</color>
+
+    <!-- Apple Music 的品牌红，只用在强调处 -->
+    <color name="accent">#FFFA233B</color>
+
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#FF8E8E93</color>
+    <color name="text_artist">#FF9A9AA0</color>
+    <!-- 再低一档的辅助字：下一首预告、页脚这类「在场但不该被读」的东西。
+         直接给 text_secondary 加 alpha 会在模糊背景上糊掉，专用一个色值更好控 -->
+    <color name="text_muted">#FF6E6E73</color>
+
+    <!-- 封面边缘：深底上没有投影可用，浮起来靠这道 1dp 亮边。
+         描边画在轮廓线上，一半被 clipToOutline 裁掉，所以宽度给 2dp -->
+    <color name="cover_edge">#33FFFFFF</color>
+
+    <color name="paused">#FF48484A</color>
+    <color name="ok">#FF3DDC97</color>
+    <color name="fail">#FFFF5C5C</color>
+    <color name="transparent">#00000000</color>
+
+    <!-- 焦点环：2dp 实白 + 外圈 6dp 低透明度做柔光 -->
+    <color name="ring_solid">#FFFFFFFF</color>
+    <color name="ring_glow">#33FFFFFF</color>
+    <color name="bar_focus">#33FFFFFF</color>
+</resources>

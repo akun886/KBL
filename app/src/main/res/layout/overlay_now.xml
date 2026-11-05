@@ -1,0 +1,607 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 播放页：一屏一首歌，左边这张唱片，右边它的词。
+
+     左栏照云音乐的播放页排：方封面居中，歌名与收藏同排在图下面，
+     歌手与合集名一行，细进度条，最后一排键里播放键做成胶囊。
+
+     三处不照搬，都是电视逼的：
+     1. 参考图把五颗键按屏幕宽度铺开（循环在最左、列表在最右）。我们左栏只有 360dp，
+        铺开就散了，改成「模式 … 三键 … 列表」——两端是状态，中间三个是动作。
+     2. 参考图里歌名旁边挂着「极高」「音效」两个标签，心下面还挂着一个数字。
+        我们没有音质档位可选，也没有公开的收藏计数——没有的东西不画，
+        否则用户会满屏去找那个开关。心只分空心/实心：收藏了没有，图标自己会说。
+     3. 时间显示是加出来的。参考图的进度条没有刻度，靠宽度看个大概；
+        电视上分辨率低、坐得远，一条 360dp 的线看不出是第几分钟。
+
+     封面是 315×177 的横卡，居中于 360 的左栏（左右各剩 22dp）；
+     聚焦环外扩 10dp 溢出在外壳之外，不占高度。
+
+     封面仍是 16:9 的横卡。参考图的方封面试过一版，B 站稿件封面是 1920×1080 的横图，
+     装进方框要裁掉两侧各四分之一（实拍图里两侧的音箱整个消失）——这笔账不划算，
+     图改回原尺寸。改的是图下面的那几行字：歌名、歌手、合集、收藏从封面下沿的
+     一条压深渐变里搬出来，各自有了位置，封面只负责交代「这是哪首歌的图」。
+
+     那条压在封面下沿的渐变（bg_cover_shade）跟着删了：字搬走之后它不再承担可读性，
+     留着只是在图的下面糊一层黑，把封面下半截吃掉。
+
+     焦点是一张显式的网，不靠几何猜：
+       封面 ──下──→ 歌手 ──右──→ 收藏心
+        ↓                        ↓
+       进度条 ←──────────────────┘（聚焦时左右键快进快退）
+        ↓
+       模式 ⇄ 上一首 ⇄ 播放 ⇄ 下一首 ⇄ 列表（横向）
+
+     歌名不可聚焦：它没有可执行的动作。按确认落在封面上时，封面就是播放/暂停。
+
+     上一首/下一首不由左右键直接触发：遥控器上「左右」是导航，
+     让它同时又是切歌，用户按错一次就换了一首，停下来都不知道自己在第几首。
+     动作交给图标，点到才执行。
+
+     右栏由控制行最右那颗图标接管：点开是「正在听的这一串」，再收起是歌词。
+     不用页签，是因为页签要常驻一整行高度，而那一行只能换来「歌词/曲目」两个词；
+     一颗图标既给出了队列的入口，又把「第几首」这件事交给了列表自己的高亮。
+
+     光是这一页的第二层结构，全部按「深底上没有投影」推导：
+       · 背景是封面放大模糊（alpha 0.75），遮罩横向渐变——左边压暗保住文字，
+         右边放亮让封面的颜色渗出来。同一首歌唱到第几遍，背景的颜色都是它。
+       · 封面浮起来靠边不靠影子：常驻 1dp 亮边 + 顶沿一道受光渐变。
+         焦点态在卡外 10dp 浮一道环——亮边画在图上面，浅色封面比它还亮，
+         只有环是跟封面颜色无关的。环亮起时卡上的边不再提亮，否则是框里套框。
+       · 进度点常显。只在聚焦时冒出来的点，等于平时没有「听到哪儿」的指针。 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/player_overlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:clickable="true"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:visibility="gone">
+
+    <!-- 封面放大模糊铺满整屏。alpha 0.1 时它等于不存在：0.1 × 遮罩剩下的 10%
+         只剩 1%，屏幕上是一块死黑。0.75 之后右半屏才透得出封面的颜色 -->
+    <ImageView
+        android:id="@+id/player_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0.75"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/now_scrim" />
+
+    <!-- 主区：左栏（封面 + 信息 + 进度 + 控制）360dp，右栏歌词吃掉剩下的宽。
+         整体垂直居中，标题一行还是两行都只是让左栏自己变高变矮，不牵动右栏。 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="40dp"
+        android:paddingEnd="40dp">
+
+        <!-- 左栏 360dp。封面 315 居中后左右各剩 22dp，就这么点余量——
+             留多了（原 420 时是 52）图和字会各走各的，左栏看起来是「一张飘着的图
+             加一堆散落的元素」；留少了封面就贴边。22dp 刚好读得出「图在栏里居中」。 -->
+        <LinearLayout
+            android:layout_width="360dp"
+            android:layout_height="wrap_content"
+            android:clipChildren="false"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <!-- 封面：315×177 的横卡，居中于 360 的左栏。
+
+                 比例仍是 16:9——B 站的稿件封面是 1920×1080，方卡要裁掉两侧各四分之一
+                 （实拍图里两侧的音箱整个消失），试过一版就撤了。
+
+                 原来封面满栏 420，左栏就是这一张图；缩到 315（原宽度的 3/4）之后，
+                 卡片成了左栏里的一块，左右各留 22dp 的呼吸。
+                 配比跟着重算：圆角 14 → 12（同比例），顶沿受光 22 → 18（图矮了 59dp，
+                 受光段按比例收）。亮边宽度不动：1.5dp 裁完只剩 0.75dp，
+                 1080p 上就是 1.5 个像素，聚焦缩放一动就闪。 -->
+            <FrameLayout
+                android:id="@+id/player_cover_wrap"
+                android:layout_width="315dp"
+                android:layout_height="177dp"
+                android:clipChildren="false">
+
+                <!-- 聚焦环：浮在卡外 10dp，盖住卡片的范围但不进图里。
+                     放在卡下面（先声明），卡聚焦放大时才不会被环压住 -->
+                <View
+                    android:id="@+id/player_cover_ring"
+                    android:layout_width="335dp"
+                    android:layout_height="197dp"
+                    android:layout_gravity="center"
+                    android:alpha="0"
+                    android:background="@drawable/bg_cover_ring"
+                    android:clickable="false"
+                    android:focusable="false" />
+
+                <FrameLayout
+                    android:id="@+id/player_cover_box"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_album"
+                    android:clickable="true"
+                    android:clipToOutline="true"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusDown="@id/player_artist">
+
+                    <ImageView
+                        android:id="@+id/player_cover"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@string/player_cover_desc"
+                        android:scaleType="centerCrop" />
+
+                    <!-- 顶沿受光。字搬走之后，这张图只剩这一道亮边和一圈轮廓在说
+                         「它是浮在底色上的」——深底上投影无效，受光只可能来自上方 -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="18dp"
+                        android:layout_gravity="top"
+                        android:background="@drawable/bg_cover_sheen"
+                        android:clickable="false"
+                        android:focusable="false" />
+
+                    <!-- 受光的边。画在最上层，压在图的轮廓线上 -->
+                    <View
+                        android:id="@+id/player_cover_edge"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_cover_edge"
+                        android:clickable="false"
+                        android:focusable="false" />
+                </FrameLayout>
+            </FrameLayout>
+
+            <!-- 空态：没有封面可画的时候，这段字就落在方卡的位置上。
+                 固定 177dp 而不是 wrap_content——位置一动不动，
+                 才不会被读成「加载中」之后又跳一下 -->
+            <LinearLayout
+                android:id="@+id/player_empty"
+                android:layout_width="315dp"
+                android:layout_height="177dp"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/now_nothing"
+                    android:textColor="@color/text_primary"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/now_nothing_hint"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- 歌名与收藏同一行。收藏从封面的右下角挪到整行右端：
+                 封面缩成方卡之后，卡内右下角离歌名太远，读起来是「图的角」而不是
+                 「这首歌的动作」。摆到行尾并放大到 44dp，它跟歌名是同一条基线的关系。
+                 用 center_vertical 而不是 bottom：两行歌名时心落在两行的中间，不飘。 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:focusable="false"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/player_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:lineSpacingMultiplier="1.1"
+                    android:maxLines="2"
+                    android:textColor="@color/text_primary"
+                    android:textSize="19sp" />
+
+                <ImageView
+                    android:id="@+id/player_fav"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="12dp"
+                    android:background="@drawable/bg_fav_glass"
+                    android:clickable="true"
+                    android:contentDescription="@string/now_fav"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusDown="@id/player_seek"
+                    android:nextFocusLeft="@id/player_artist"
+                    android:nextFocusUp="@id/player_cover_box"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_heart"
+                    android:tint="@color/text_primary" />
+            </LinearLayout>
+
+            <!-- 歌手与合集名同一行。
+                 歌手在最前：它是这张卡上唯一通向「这个人」的入口，不能被挤到后面去。
+                 合集名只能跟着走——B 站的合集名动辄「【Hi-Res无损音质】王杰歌曲音乐合集」，
+                 给它 weight 1 吃掉剩下的宽，超长自己省略。
+                 分成两行会让左栏再多 20dp，而左栏已经贴到屏幕下沿了。 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:focusable="false"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <!-- 歌手名可以聚焦：确认键打开作者主页，到那儿关注。
+                     焦点态在代码里画（提亮 + 下划线），见 NowPlaying -->
+                <TextView
+                    android:id="@+id/player_artist"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:clickable="true"
+                    android:ellipsize="end"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:maxLines="1"
+                    android:maxWidth="220dp"
+                    android:nextFocusDown="@id/player_seek"
+                    android:nextFocusRight="@id/player_fav"
+                    android:nextFocusUp="@id/player_cover_box"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/player_album"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="10dp"
+                    android:ellipsize="end"
+                    android:focusable="false"
+                    android:maxLines="1"
+                    android:textColor="@color/text_muted"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- 进度条：26dp 是焦点热区，视觉上只有 4dp 的线加一个 10dp 的常驻点
+                 （3dp 时在 1080p、三米外几乎看不见，而进度条是这一页唯一的「刻度」） -->
+            <FrameLayout
+                android:id="@+id/player_seek"
+                android:layout_width="match_parent"
+                android:layout_height="26dp"
+                android:layout_marginTop="18dp"
+                android:background="@drawable/bg_seek"
+                android:clickable="true"
+                android:contentDescription="@string/now_seek"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:nextFocusDown="@id/player_mode"
+                android:nextFocusUp="@id/player_artist">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="4dp"
+                    android:layout_gravity="center_vertical">
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@color/seek_track" />
+
+                    <View
+                        android:id="@+id/player_fill"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@color/seek_fill"
+                        android:scaleX="0"
+                        android:transformPivotX="0dp" />
+                </FrameLayout>
+
+                <!-- 常显：只在聚焦时冒出来的点，等于「进度」这件事平时没有指针。
+                     10dp 是刚好能在三米外看见的最小尺寸，聚焦时由 NowPlaying
+                     放大到 15dp，不换图、不换色 -->
+                <View
+                    android:id="@+id/player_thumb"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_gravity="center_vertical"
+                    android:background="@drawable/bg_circle_white" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:orientation="horizontal">
+
+                <!-- 已播时间亮、总时长暗：这两个数回答的不是同一个问题，
+                     前者是「听到哪儿了」，后者只是刻度，同色会让刻度抢读 -->
+                <TextView
+                    android:id="@+id/player_pos"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/player_dur"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- 下一首是谁。以前只能按过去听一遍才知道，而「这张合集还有没有
+                 下一首」决定了要不要现在就换。单曲循环与随机不画，见 NowPlaying。
+
+                 固定 16dp 高、没有时 INVISIBLE 而不是 GONE：这一版左栏已经贴到
+                 屏幕下沿，它一出现就把控制行往下顶 20dp、一消失又弹回去，
+                 整排键在换歌时上下跳一次，比少两行预告难看。 -->
+            <TextView
+                android:id="@+id/player_next_hint"
+                android:layout_width="match_parent"
+                android:layout_height="16dp"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_muted"
+                android:textSize="11sp"
+                android:visibility="invisible" />
+
+            <!-- 控制行：两端各一个图标（播放模式、播放列表），中间三个是动作。
+                 播放键做成横向胶囊，和参考图一致——它是这一排唯一会被连按的键，
+                 胶囊比圆更像「容器」，也把五颗键的重心钉在正中 -->
+            <LinearLayout
+                android:id="@+id/player_bar"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="12dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <!-- 模式用图标不用字：三个模式各写两个字，等于每首歌都让人读一遍
+                     已经知道的东西，而且「顺序」比「3 / 30」窄，播放键会被挤偏一格。
+                     换了哪一档仍然会用一次飘字提示补上，见 MainActivity.cycleMode -->
+                <ImageView
+                    android:id="@+id/player_mode"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_icon_focus"
+                    android:clickable="true"
+                    android:contentDescription="@string/mode_order"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusRight="@id/player_prev"
+                    android:nextFocusUp="@id/player_seek"
+                    android:padding="9dp"
+                    android:src="@drawable/ic_mode_order"
+                    android:tint="@color/bar_icon" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <ImageView
+                    android:id="@+id/player_prev"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_icon_focus"
+                    android:clickable="true"
+                    android:contentDescription="@string/bar_prev"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@id/player_mode"
+                    android:nextFocusRight="@id/player_play"
+                    android:nextFocusUp="@id/player_seek"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_prev"
+                    android:tint="@color/bar_icon" />
+
+                <!-- 84×44 的胶囊。原来是 44dp 的圆：圆在三颗动作键里读作「又一个图标」，
+                     而这一颗是唯一会被连按的键，该有分量。横向拉长之后，
+                     它自己就成了这一排的锚点，左右两颗上一首/下一首退成它的卫星。
+
+                     20% 半透明白，不是实白：实心块会在封面之外造出第二个视觉重心。
+                     焦点靠放大 + 加亮边表示 -->
+                <ImageView
+                    android:id="@+id/player_play"
+                    android:layout_width="84dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="12dp"
+                    android:background="@drawable/bg_play_glass"
+                    android:clickable="true"
+                    android:contentDescription="@string/bar_play"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@id/player_prev"
+                    android:nextFocusRight="@id/player_next"
+                    android:nextFocusUp="@id/player_seek"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_pause"
+                    android:tint="@color/text_primary" />
+
+                <ImageView
+                    android:id="@+id/player_next"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="12dp"
+                    android:background="@drawable/bg_icon_focus"
+                    android:clickable="true"
+                    android:contentDescription="@string/bar_next"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@id/player_play"
+                    android:nextFocusRight="@id/player_list_open"
+                    android:nextFocusUp="@id/player_seek"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_next"
+                    android:tint="@color/bar_icon" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <!-- 「3 / 45」换成播放列表：数字只回答「第几首」，列表直接让人换歌。
+                     打开后右栏换成列表，歌词让位——同一个位置只站一个东西 -->
+                <ImageView
+                    android:id="@+id/player_list_open"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_icon_focus"
+                    android:clickable="true"
+                    android:contentDescription="@string/now_list_open"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusLeft="@id/player_next"
+                    android:nextFocusUp="@id/player_seek"
+                    android:padding="9dp"
+                    android:src="@drawable/ic_nav_queue"
+                    android:tint="@color/bar_icon" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 右栏：一屏只能看一样东西——词，或者正在听的那一串。
+             翻页不用页签，用左栏控制行最右那颗「列表」图标：页签要占一整行高度，
+             而这一页多一行抬头，歌词就少看见一句。 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="40dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <!-- 列表打开时才出现的抬头：告诉你这是「这一串里的第几首」，
+                 右边一个叉用来收起来。收起之后这一行整块 GONE，
+                 歌词往上补位——同一个位置只站一个东西 -->
+            <LinearLayout
+                android:id="@+id/player_list_head"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="40dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/now_list_title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/player_list_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <ImageView
+                    android:id="@+id/player_list_close"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:background="@drawable/bg_icon_focus"
+                    android:clickable="true"
+                    android:contentDescription="@string/now_list_close"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_close"
+                    android:tint="@color/bar_icon" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <!-- 上下各 56dp：歌词原来从 y=0 开始，第一句永远贴着屏幕上沿，
+                     电视的 overscan 还会再切掉一截。收进来之后当前行仍在屏幕正中
+                     （上下等距），但边缘那几行退到了安全区以内 -->
+                <com.kunplayer.tv.ui.LyricsView
+                    android:id="@+id/player_lyrics"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_marginTop="56dp"
+                    android:layout_marginBottom="56dp" />
+
+                <!-- 没有歌词时这一屏给频谱：一首没有字幕的歌，右半边本来只能写
+                     「暂无歌词」四个字，而那四个字回答不了「这首歌现在是什么样」。
+                     频谱是这一页唯一能替歌词占住这块地方的东西。
+
+                     样式（柱状 / 波形 / 环形）与颜色都在「我的」里设，这里不摆开关：
+                     播放页的焦点网是给「听歌」用的，多两颗按钮会把方向键的去处打乱。 -->
+                <com.kunplayer.tv.ui.SpectrumView
+                    android:id="@+id/player_spectrum"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_marginTop="72dp"
+                    android:layout_marginBottom="96dp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/player_lyrics_empty"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|center_horizontal"
+                    android:layout_marginBottom="30dp"
+                    android:alpha="0.45"
+                    android:text="@string/now_lyrics_none"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+
+                <!-- 列表：正在听的这一串（队列，或这张合集的曲目）。
+                     100 首也能滚；下边留 40dp，别让最后一行贴着屏幕边 -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/player_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="40dp"
+                    android:visibility="gone" />
+            </FrameLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 按键说明：只在刚进应用时出现几秒，然后淡出。
+         常驻会变成一行每次都一样的噪声，删掉又会让「上下能翻出什么」没人知道。
+
+         从左下挪到右下：这一版左栏长到了 474dp，离屏幕下沿只剩 30dp，
+         说明文字压在那儿会跟控制行打架。右栏底部那 56dp 本来就是给歌词留的
+         安全区，落在这儿谁也不挡。 -->
+    <TextView
+        android:id="@+id/player_keys"
+        android:layout_width="420dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="40dp"
+        android:layout_marginBottom="14dp"
+        android:maxLines="2"
+        android:text="@string/now_keys"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp" />
+</FrameLayout>

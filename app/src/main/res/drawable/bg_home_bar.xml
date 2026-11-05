@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 底部正在播放条。
+
+     整条不再是焦点位：焦点落在里面的每一颗键上（封面 / 歌名 / 上一首 / 播放 /
+     下一首 / 播放模式 / 收藏），条本身只负责把这一行托住。所以这里没有 selector，
+     只有一层 95% 的底 + 一道 1dp 顶边。
+
+     为什么还要一道顶边：底下铺的是封面模糊，95% 的底压在图上，边界的对比度
+     只有十来个色阶，不留一道线，条和列表会糊在一起。 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#F2101013" />
+        </shape>
+    </item>
+    <item
+        android:gravity="top"
+        android:height="1dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#26FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

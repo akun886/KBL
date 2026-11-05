@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 一条搜索历史。常态是一块很淡的玻璃（看得出是块，但不抢眼），
+     聚焦时整块翻白、字变黑——和键盘上的键同一种表达，
+     因为它们在同一个左栏里，按下去都是「执行」而不是「移动」。
+
+     没复用 bg_key：那个圆角 9dp，在 36dp 高的条子上显得方；这里用 10dp + 全胶囊。
+     也没用 bg_pill_dark：那个圆角 24dp 是给 44dp 的播放模式胶囊的。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="10dp" />
+            <solid android:color="#FFFFFFFF" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="10dp" />
+            <solid android:color="#1FFFFFFF" />
+        </shape>
+    </item>
+</selector>

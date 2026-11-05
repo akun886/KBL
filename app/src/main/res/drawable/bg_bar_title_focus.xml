@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 底栏歌名的焦点底板。
+
+     歌名是字，不是图标。套用图标键那套「玻璃方盒 + 亮边」，等于在一个字的
+     外面画一个框——很难看，而且框比字还宽，看着像给字加了个边框。
+
+     这里只垫一块玻璃，不描边。字本身是纯白的，底块把它从深色底栏上托出来
+     就够了；加边是给「没有文字」用的手法。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#33FFFFFF" />
+            <corners android:radius="6dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@android:color/transparent" />
+            <corners android:radius="6dp" />
+        </shape>
+    </item>
+</selector>

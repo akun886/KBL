@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 单曲循环：和顺序同一个环，中间多一个「1」。
+     只换中间那一笔、不动外环，是为了让三个模式在遥控器三米外只比「中间有没有东西」——
+     两套完全不同的图形，用户得先认图再认字，等于每次都重新学一遍。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7,7h10v3l4,-4l-4,-4v3H5v6h2V7z M17,17H7v-3l-4,4l4,4v-3h12v-6h-2v4z M14,15.8V8.6h-1.3l-2.5,1.35v1.35h1.9V15.8z" />
+</vector>

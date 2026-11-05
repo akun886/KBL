@@ -1,0 +1,578 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 首页。骨架照汽水音乐的桌面版：左侧导航 / 右侧歌单详情 / 底部正在播放条。
+
+     为什么首页要有列表、而播放页没有：
+     这两页回答的是两个不同的问题。「今天听什么」需要看见十个歌名并比较；
+     「这首歌怎么样」只服务一首。前一个问题用一屏一首歌回答不了，
+     后一个问题用列表回答只会让人一边听一边找光标。
+
+     导航栏取代了原来上键唤出的歌单抽屉：抽屉里那五个来源，
+     现在就是左边一列目的地。抽屉的问题不是藏得深，是「进入某类歌单」和
+     「从抽屉里挑一首」被压成了同一个动作，每次都得先换来源再选歌。
+
+     这一页现在和播放页是同一个世界，三件事：
+       1. 底下铺当前歌单封面的模糊图（home_bg + home_scrim）。听的是哪张歌单，
+          整页就带一点它的颜色；侧栏压到 94%，只透色相不透画面。
+       2. 头图升级成播放页同款封面卡：12dp 圆角、2dp 常驻亮边、顶沿 18dp 受光。
+          不是「一个圆角矩形」，是「一张浮起来的图」。
+       3. 按键全部换成玻璃 + 亮边：导航项、播放全部、底栏五颗键。
+          首页和播放页从此不再是一套骨架配两种皮肤。
+
+     底栏那一排在 0.22.0 之前是「长得像按钮但按不动」的：三颗 prev/play/next 是裸
+     ImageView，没有 clickable，代码里也从没引用过。现在它们是真按键。
+
+     焦点这一版最大的改动是「到不了底栏」。原来从列表第一行去底栏要按三十多下——
+     一行一行走到列表末尾才轮到底栏。现在三条路：
+       · 列表里**按住下键**（连续 8 次重复，约 0.9 秒）直达底栏；
+       · 侧栏走到最后一项（账户）再按下，落到底栏；
+       · 到底栏之后按上，回到来的地方（列表来的回列表，侧栏来的回侧栏）。
+     单击下键仍然是一行一行走，长按才跳——电视上「按住」本来就是「我要到头」。 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/home_stage"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg">
+
+    <!-- 当前歌单封面放大模糊，铺满整页。alpha 由代码淡入（0 → 0.8）：
+         换目的地时换图，硬切会闪一下白 -->
+    <ImageView
+        android:id="@+id/home_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/home_scrim" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:paddingBottom="62dp">
+
+        <LinearLayout
+            android:layout_width="200dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_sidebar"
+            android:orientation="vertical"
+            android:paddingStart="10dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="10dp">
+
+            <!-- 品牌位：字母 K + 中文名。K 是矢量图（ic_logo_k），
+                 名字是 Text——写进图片里就没法随系统字号和语言换，
+                 也没法被读屏念出来。两者基线对齐，高度比取 24:20，
+                 比齐平更稳：等高的图标会把字压成一行小注脚。 -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="14dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:layout_width="wrap_content"
+                    android:layout_height="20dp"
+                    android:adjustViewBounds="true"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_logo_k" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.02"
+                    android:text="@string/app_name"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/home_nav"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingStart="36dp"
+            android:paddingTop="22dp"
+            android:paddingEnd="36dp">
+
+            <!-- 头图：280×158，16:9 横卡，跟播放页的封面卡同一套三层
+                 （图 → 顶沿受光 → 2dp 亮边）。比播放页那张 315×177 略小：
+                 这一栏还要放标题、播放全部和五到六行歌，头图再长一档，
+                 一屏就只剩四行——「今天听什么」需要的是行数。 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <FrameLayout
+                    android:id="@+id/home_cover_box"
+                    android:layout_width="280dp"
+                    android:layout_height="158dp"
+                    android:background="@drawable/bg_album"
+                    android:clipToOutline="true">
+
+                    <ImageView
+                        android:id="@+id/home_cover"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@null"
+                        android:scaleType="centerCrop" />
+
+                    <!-- 顶沿受光。压在图上、亮边下 -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="18dp"
+                        android:layout_gravity="top"
+                        android:background="@drawable/bg_cover_sheen" />
+
+                    <!-- 受光的边。深底上投影没有对比度，浮起来只能靠这道边 -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_cover_edge" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="24dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/home_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:fontFamily="sans-serif-medium"
+                        android:maxLines="1"
+                        android:textColor="@color/text_primary"
+                        android:textSize="26sp" />
+
+                    <TextView
+                        android:id="@+id/home_sub"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <!-- 「换一批」。只在「推荐音乐」这一页出现——别的目的地没有
+                             可换的东西，摆一颗按不动的按钮是电视上最坏的一种误导，
+                             所以默认 gone。
+
+                             无字的圆玻璃：和右边那颗「播放全部」同一份底板
+                             （bg_play_all，34dp 高配 17dp 圆角就是正圆）。
+                             位置在主按钮**前面**，是因为它是个次要动作——
+                             可焦点默认落在这儿：进这一页的人要的就是「再换一批」，
+                             而「播放全部」本来就能从列表上按直接起播。 -->
+                        <ImageView
+                            android:id="@+id/home_refresh"
+                            android:layout_width="34dp"
+                            android:layout_height="34dp"
+                            android:layout_marginEnd="10dp"
+                            android:background="@drawable/bg_play_all"
+                            android:clickable="true"
+                            android:contentDescription="@string/home_refresh"
+                            android:focusable="true"
+                            android:focusableInTouchMode="true"
+                            android:nextFocusRight="@id/home_play_all"
+                            android:padding="8dp"
+                            android:src="@drawable/ic_refresh"
+                            android:tint="@color/text_primary"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/home_play_all"
+                            android:layout_width="wrap_content"
+                            android:layout_height="34dp"
+                            android:background="@drawable/bg_play_all"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:focusableInTouchMode="true"
+                            android:fontFamily="sans-serif-medium"
+                            android:gravity="center"
+                            android:paddingStart="20dp"
+                            android:paddingEnd="20dp"
+                            android:text="@string/home_play_all"
+                            android:textColor="@color/play_all_text"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/home_count"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <!-- 收藏夹管理。只在「我的收藏」这一页出现：
+                         别的地方没有收藏夹可管，摆出来就是两个点不动的按钮。
+
+                         两个按钮之间织一条横网：它们同排，右键从「新建」到「删除」，
+                         左键再回来。不织的话 FocusFinder 会按几何位置挑，
+                         挑中的不一定是旁边那个。 -->
+                    <LinearLayout
+                        android:id="@+id/home_fav_tools"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:id="@+id/home_fav_new"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_play_all"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:focusableInTouchMode="true"
+                            android:gravity="center"
+                            android:nextFocusRight="@id/home_fav_del"
+                            android:paddingStart="16dp"
+                            android:paddingEnd="16dp"
+                            android:text="@string/fav_new_folder"
+                            android:textColor="@color/play_all_text"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/home_fav_del"
+                            android:layout_width="wrap_content"
+                            android:layout_height="32dp"
+                            android:layout_marginStart="10dp"
+                            android:background="@drawable/bg_play_all"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:focusableInTouchMode="true"
+                            android:gravity="center"
+                            android:nextFocusLeft="@id/home_fav_new"
+                            android:paddingStart="16dp"
+                            android:paddingEnd="16dp"
+                            android:text="@string/fav_del_folder"
+                            android:textColor="@color/play_all_text"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 列头。与 item_track_row 的列宽一一对应，改一处就要改另一处。
+                 「推荐 UP 主」那一页的列是头像/名字/曲数，和这份列头对不上，
+                 所以那一页把它整个藏掉——列头与表格错位比没有列头更糟 -->
+            <LinearLayout
+                android:id="@+id/home_cols"
+                android:layout_width="match_parent"
+                android:layout_height="24dp"
+                android:layout_marginTop="16dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp">
+
+                <Space
+                    android:layout_width="14dp"
+                    android:layout_height="1dp" />
+
+                <TextView
+                    android:layout_width="28dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/home_col_index"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/home_col_song"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="190dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="@string/home_col_artist"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="56dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:text="@string/home_col_dur"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="4dp"
+                android:background="@color/hairline" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/home_list"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="4dp"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:descendantFocusability="afterDescendants"
+                android:overScrollMode="never"
+                android:scrollbars="none" />
+
+            <TextView
+                android:id="@+id/home_note"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 底部正在播放条。整条不是焦点位，焦点落在里面每一颗键上：
+         封面、歌名、上一首、播放、下一首、播放模式、收藏。
+
+         条的右半边是一排 40dp 的玻璃方盒。播放键 44dp 用玻璃胶囊，是这一排里
+         唯一的重心；其余四颗是纯图标，聚焦时浮出方盒加一道亮边。
+
+         这三份底板是底栏专用的（bg_bar_icon_focus / bg_bar_play_glass /
+         bg_bar_title_focus），没有直接复用播放页那两份。播放页 0.21.0 定稿了，
+         那边「胶囊常态就是全页最亮的那颗」的规则在底栏不成立：底栏有五颗键，
+         都那么亮的话，最亮的那颗就不再代表焦点所在。
+
+         「确认 打开播放页」那行常驻小字删掉了：底栏自己就是播放页的入口，
+         每一颗键按下去都有反应之后，不再需要一句话解释它。 -->
+    <FrameLayout
+        android:id="@+id/home_bar"
+        android:layout_width="match_parent"
+        android:layout_height="62dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_home_bar">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="32dp"
+            android:paddingEnd="24dp">
+
+            <FrameLayout
+                android:id="@+id/home_bar_cover_box"
+                android:layout_width="75dp"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_bar_cover"
+                android:clickable="true"
+                android:clipToOutline="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:nextFocusRight="@id/home_bar_title">
+
+                <ImageView
+                    android:id="@+id/home_bar_cover"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop" />
+            </FrameLayout>
+
+            <!-- 歌名与歌手。歌名可聚焦：确认进播放页。
+                 宽 wrap_content 而不是 match_parent——焦点底只裹住字，
+                 拉满一行会变成一条横贯的灰带 -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/home_bar_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                        android:background="@drawable/bg_bar_title_focus"
+                        android:clickable="true"
+                        android:ellipsize="end"
+                        android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:maxLines="1"
+                    android:nextFocusLeft="@id/home_bar_cover_box"
+                    android:nextFocusRight="@id/home_bar_prev"
+                    android:paddingStart="8dp"
+                    android:paddingTop="2dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="2dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp" />
+
+                <!-- 歌手 / 歌词 / 频谱共用一行。
+                     歌词从歌手后面空两个字符开始滚动——两个字的距离是「这句话换了一个人说的」
+                     的停顿，紧贴着歌手会读成「歌手长这样」。
+                     没有歌词时那块位置放频谱：一条正在播的歌，底下那行只写个歌手太浪费。 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="16dp"
+                    android:layout_marginTop="3dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/home_bar_artist"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:maxWidth="180dp"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <FrameLayout
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="24dp"
+                        android:layout_weight="1">
+
+                        <TextView
+                            android:id="@+id/home_bar_lyric"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center_vertical"
+                            android:ellipsize="marquee"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false"
+                            android:includeFontPadding="false"
+                            android:marqueeRepeatLimit="marquee_forever"
+                            android:singleLine="true"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp" />
+
+                        <com.kunplayer.tv.ui.SpectrumView
+                            android:id="@+id/home_bar_spectrum"
+                            android:layout_width="36dp"
+                            android:layout_height="14dp"
+                            android:layout_gravity="start|center_vertical"
+                            android:visibility="gone" />
+                    </FrameLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/home_bar_prev"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_bar_icon_focus"
+                android:clickable="true"
+                android:contentDescription="@string/bar_prev"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:nextFocusLeft="@id/home_bar_title"
+                android:nextFocusRight="@id/home_bar_play"
+                android:padding="10dp"
+                android:src="@drawable/ic_prev"
+                android:tint="@color/bar_icon" />
+
+            <ImageView
+                android:id="@+id/home_bar_play"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_bar_play_glass"
+                android:clickable="true"
+                android:contentDescription="@string/bar_play"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:nextFocusLeft="@id/home_bar_prev"
+                android:nextFocusRight="@id/home_bar_next"
+                android:padding="12dp"
+                android:src="@drawable/ic_play"
+                android:tint="@color/text_primary" />
+
+            <ImageView
+                android:id="@+id/home_bar_next"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_bar_icon_focus"
+                android:clickable="true"
+                android:contentDescription="@string/bar_next"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:nextFocusLeft="@id/home_bar_play"
+                android:nextFocusRight="@id/home_bar_mode"
+                android:padding="10dp"
+                android:src="@drawable/ic_next"
+                android:tint="@color/bar_icon" />
+
+            <ImageView
+                android:id="@+id/home_bar_mode"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="16dp"
+                android:background="@drawable/bg_bar_icon_focus"
+                android:clickable="true"
+                android:contentDescription="@string/bar_mode"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:nextFocusLeft="@id/home_bar_next"
+                android:nextFocusRight="@id/home_bar_fav"
+                android:padding="10dp"
+                android:src="@drawable/ic_mode_order"
+                android:tint="@color/bar_icon" />
+
+            <ImageView
+                android:id="@+id/home_bar_fav"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_bar_icon_focus"
+                android:clickable="true"
+                android:contentDescription="@string/now_fav"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:nextFocusLeft="@id/home_bar_mode"
+                android:padding="11dp"
+                android:src="@drawable/ic_heart"
+                android:tint="@color/accent" />
+        </LinearLayout>
+
+        <!-- 进度压在这条 2dp 的线上，比在底栏里再塞一根进度条省一整行 -->
+        <View
+            android:id="@+id/home_bar_fill"
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:layout_gravity="bottom"
+            android:background="@color/seek_fill"
+            android:scaleX="0"
+            android:transformPivotX="0dp" />
+    </FrameLayout>
+</FrameLayout>
