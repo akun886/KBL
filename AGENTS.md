@@ -205,8 +205,9 @@ QQ 音乐 TV 版的双栏。
   `EFFECT_NOT_AVAILABLE`）。
 - **`setEnableAudioFloatOutput(false)` 必须留着。** 开着浮点输出时 `onConfigure` 收到
   `ENCODING_PCM_FLOAT`，分析器只认 16bit 会返回 `NOT_SET` 自关——表现是「频谱不动」，不崩溃。
-- **`queueInput` 的输出必须与输入等长**（`replaceOutputBuffer(n)`）。多写少写会让 `AudioTrack`
-  的时钟与画面错位。
+- **`queueInput` 的输出必须与输入等长**（`replaceOutputBuffer(n)`），而且要写满 `n` 个样本：
+  末块按 `minOf(channels, n - idx)` 收尾，只跑 `frames = n / channels` 次会在输出 buffer
+  尾部留下上一块的脏数据。多写少写会让 `AudioTrack` 的时钟与画面错位。
 - **频谱三处职责不同，不要合并。** 播放页右栏（无歌词时）跟真实频带；列表行是**假动**
   （5 根正弦相位柱，只回答「就是这首」，播放中才动）；首页底栏窄条（36×14dp）**只画柱状**——
   环形需要方形的地、波形 96 采样摊在 72 像素上是一道糊。
@@ -214,6 +215,21 @@ QQ 音乐 TV 版的双栏。
   只填了左边三分之一。
 - **`SpectrumView.start()` 用 `isShown` 判断，不用 `visibility`。** 藏起来的播放页 /
   浮层里的视图自身 `visibility` 仍是 VISIBLE，按 `visibility` 判会一直空转。
+- **响度均衡是「歌与歌之间拉齐」，不是歌内动态压缩**（0.29.2 起）。每首歌开头测 5 秒
+  长时 RMS（静音块不计），算出**一个固定增益**锁死，之后整首恒定；测量期每 0.5 秒
+  用**累积**长时 RMS 刷一次候选、gain 平滑跟着走，开头才不会先响一下再变小。
+  切歌由 `AudioPlayer.play()` 调 `tap.newTrack()` 重置，
+  **seek / 暂停恢复不能重置**——`onFlush()` 只清 FFT 窗口。均衡关掉时持续清测量状态，
+  重新打开自动重测。
+- **峰值保护必须慢起更慢落，绝不逐块硬钳。** 0.29.1 用 `g = min(gain, 32272 / 这一块的 peak)`：
+  鼓点一来增益当场砍一半、下一块又弹回；叠加「每 0.55s 拿单块瞬时 RMS 重算目标、
+  增益一直追随机值」，真机上就是「音量自己突然变大变小」。现在 `guard` 系数
+  attack 0.02 / release 0.001（约 1 秒 / 20 秒时间常数），锁定时天花板还按
+  `maxPeak × 1.12` 留了余量。试过 0.25 / 0.003：seek 到高响度段后 guard 仍在
+  0.84~0.93 来回摆，整体增益有约 1dB 起伏，不够干净。
+  `AudioTap` 只在整体增益变动 ≥2% 时打一行「响度 变化」，锁定后应当安静；再有人说
+  「音量自己变」，先看这几行。**音频链路的 `log` 只进 logcat，不进 `diag.log`**
+  （`PlaybackController.log()` 只做 `Log.i`），拿 `adb logcat -s KunPlayer:I` 抓。
 - **响度均衡参数不要随手放大**：`TARGET_RMS 0.11`、增益 0.4~2.5、每块最多挪 3%、
   峰值留 1.5% 余量。早期用 0.125 / 上限 3.2 时整首歌被压到 ×0.64，用户直接听出「变小声」。
 - **断点续播的键必须是 `bvid#cid`。** 合集 100 P 共用一个 bvid，按 bvid 存会互相覆盖。

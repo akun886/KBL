@@ -31,8 +31,8 @@ android {
         applicationId = "com.kunplayer.tv"
         minSdk = 23          // 小米电视4A：Android 6.0.1 / API 23
         targetSdk = 28       // 老设备上不引入分区存储、前台服务类型等新限制
-        versionCode = 39
-        versionName = "0.29.1"
+        versionCode = 40
+        versionName = "0.29.2"
     }
 
     signingConfigs {

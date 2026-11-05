@@ -8,6 +8,7 @@ import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.log10
 import kotlin.math.sin
@@ -27,8 +28,13 @@ import kotlin.math.sqrt
  *
  * 1. **频谱**——1024 点 FFT，对数分 32 个频带，供 [com.kunplayer.tv.ui.SpectrumView] 画柱状/环形；
  * 2. **波形**——窗口最后 96 个采样点，画示波器；
- * 3. **响度均衡**——按 RMS 算出目标增益，逐块平滑地乘回样本。慢起慢落（每秒只动 8%），
- *    不做压缩器那种「一响就压」的动作，否则一首歌里副歌一进来整曲会往回缩。
+ * 3. **响度均衡**——每首歌开头测 5 秒长时 RMS，算出**一个固定增益**后锁死，整首不再变。
+ *
+ * 均衡是「歌与歌之间拉齐」，不是歌内动态压缩。0.29.1 曾用瞬时 RMS 逐块追目标：
+ * 每 0.55 秒拿那一块的 RMS 重算一次目标，增益一直追一个随机游走的值；再叠加
+ * 逐块硬钳的峰值保护（鼓点一来增益当场砍一半、下一块弹回），听感就是
+ * 「音量自己突然变大变小」。现在歌内增益恒定，峰值保护改成慢起更慢落，
+ * 锁定时还给天花板留一档峰值余量，让播放期的兜底几乎不必动。
  *
  * 只在 16 位 PCM 上启用（[onConfigure] 里判），其余格式返回 NOT_SET 直接旁路：
  * 浮点输出会让这段增益运算变成另一套量纲，宁可不做也不要算错。
@@ -62,14 +68,38 @@ class AudioTap(
         private const val MIN_GAIN = 0.4f
         private const val MAX_GAIN = 2.5f
 
-        /** 每块向目标靠 3%：一首歌里渐强渐弱时听不出「被拉了一把」 */
+        /** 锁定后向固定增益靠拢的速度：以 20ms 的块为基准，每块 3% */
         private const val GAIN_SLEW = 0.03f
 
-        /** 低于这个 RMS 当成静音，保持当前增益不追——否则间奏里增益会飙到上限 */
+        /** 低于这个 RMS 当成静音，不进长时响度统计——淡入和间奏会把测量拉偏 */
         private const val SILENCE = 0.004f
 
-        /** 每多少块重算一次目标增益。一块约 20~40ms，24 块约 0.5~1 秒 */
+        /** 测够多少有效音频才锁定。5 秒足以跨过前奏，又不至于让人等太久 */
+        private const val MEASURE_MS = 5000f
+        private const val MIN_MEASURE_BLOCKS = 100
+
+        /** 测量期每多少个有效块用累积值刷新一次候选。24 块约 0.5 秒 */
         private const val GAIN_WINDOW = 24
+
+        /** 满幅留 1.5% 余量。锁定时的天花板与播放期的兜底共用同一个数 */
+        private const val PEAK_LIMIT = 32767f * 0.985f
+
+        /**
+         * 测量窗口只覆盖开头，副歌的峰值通常更高。锁定时按 `maxPeak × 1.12`
+         * 算天花板：宁可少放大一点，也不要整首靠播放期的兜底一路压着走。
+         * 只对「需要放大」的歌起作用，`fixedGain < 1` 的歌不受影响。
+         */
+        private const val PEAK_MARGIN = 1.12f
+
+        /**
+         * 峰值保护的慢起、更慢落。attack 时间常数约 1 秒，鼓点级瞬态根本来不及
+         * 拉动 guard；release 约 20 秒，回落慢到听不出「被拉了一把」。
+         * 真机上试过 0.25 / 0.003：seek 到高响度段后 guard 在 0.84~0.93 来回摆，
+         * 整体增益仍有约 1dB 起伏。超出的瞬态交给逐样本钳位，宁可极短促地削一下，
+         * 也不要整体音量跟着音乐抽。
+         */
+        private const val GUARD_ATTACK = 0.02f
+        private const val GUARD_RELEASE = 0.001f
     }
 
     /** 每帧的频带能量 0..1，从左到右由低到高 */
@@ -101,9 +131,25 @@ class AudioTap(
     private val window = FloatArray(FFT_N) { 0.5f - 0.5f * cos(2.0 * Math.PI * it / (FFT_N - 1)).toFloat() }
     private val fft = Fft(FFT_N)
 
+    /** 实际乘到 PCM 上的增益。只在每首歌锁定后过渡一次，之后整首恒定 */
     private var gain = 1f
-    private var target = 1f
-    private var blocks = 0
+
+    /** 锁定后的固定增益。由长时 RMS 算一次，不再重算 */
+    private var fixedGain = 1f
+
+    /** 峰值保护系数 0..1，快起慢落乘在 gain 上 */
+    private var guard = 1f
+
+    private var locked = false
+    private var rmsSqSum = 0.0
+    private var validBlocks = 0
+    private var measureMs = 0f
+    private var maxPeak = 0
+
+    /** 自证：只在整体增益真的动了大步时才落一行日志 */
+    private var lastLoggedG = 1f
+    private var lastGainLogAt = 0L
+
     private var loggedFirst = false
     private var loggedGain = false
 
@@ -140,8 +186,27 @@ class AudioTap(
     }
 
     override fun onFlush() {
+        // 只清 FFT 窗口。seek / 缓冲 / 暂停恢复都走到这里，增益不能跟着重置，
+        // 否则拖一次进度条就要重测响度、音量会变。换歌由 newTrack() 显式重置。
         monoAt = 0
         lastFftAt = 0L
+    }
+
+    /** 换歌时调：重新测这一首的响度。由 [com.kunplayer.tv.player.AudioPlayer.play] 驱动 */
+    fun newTrack() {
+        onFlush()
+        resetMeasure()
+    }
+
+    private fun resetMeasure() {
+        gain = 1f
+        fixedGain = 1f
+        guard = 1f
+        locked = false
+        rmsSqSum = 0.0
+        validBlocks = 0
+        measureMs = 0f
+        maxPeak = 0
     }
 
     override fun onReset() {
@@ -149,9 +214,7 @@ class AudioTap(
         bands.fill(0f)
         wave.fill(0f)
         level = 0f
-        gain = 1f
-        target = 1f
-        blocks = 0
+        resetMeasure()
         updatedAt = 0L
     }
 
@@ -170,7 +233,7 @@ class AudioTap(
         val frames = n / channels
 
         // 先量这一块，再决定这一块乘多少。量的是「进来时」的响度，
-        // 目标增益才是「总共该乘多少」；拿放大后的样本去算，会自己追自己，永远收敛不了
+        // 固定增益才是「总共该乘多少」；拿放大后的样本去算，会自己追自己
         var sum = 0.0
         var peak = 0
         for (i in 0 until n) {
@@ -181,19 +244,18 @@ class AudioTap(
         }
         val rms = (sqrt(sum / n) / 32768.0).toFloat()
         val now = SystemClock.elapsedRealtime()
-        stepGain(rms)
+        val blockMs = frames * 1000f / sampleRate
+        val normalize = AudioBus.normalize
+        updateGain(rms, peak, blockMs, normalize)
 
-        // 峰值留 1.5% 余量：增益乘上去顶到 32767 就是爆音，宁可这一段少给一点
-        var g = if (AudioBus.normalize) gain else 1f
-        if (peak > 0) {
-            val room = 32767f * 0.985f / peak
-            if (room < g) g = room
-        }
+        val g = if (normalize) gain * guard else 1f
 
         var idx = 0
-        for (f in 0 until frames) {
+        while (idx < n) {
+            // 末块可能不是整帧：count 取剩余数，别让 dst 尾部留着上一块的脏数据
+            val count = minOf(channels, n - idx)
             var acc = 0
-            for (c in 0 until channels) {
+            for (c in 0 until count) {
                 var v = (src.get(idx) * g).toInt()
                 if (v > 32767) v = 32767 else if (v < -32768) v = -32768
                 dst.put(idx, v.toShort())
@@ -201,7 +263,7 @@ class AudioTap(
                 idx++
             }
             if (monoAt < FFT_N) {
-                mono[monoAt++] = acc.toFloat() / channels / 32768f
+                mono[monoAt++] = acc.toFloat() / count / 32768f
                 if (monoAt == FFT_N) {
                     analyze(now)
                     monoAt = 0
@@ -214,23 +276,69 @@ class AudioTap(
         updatedAt = now
     }
 
-    /** 目标增益按块慢慢靠。具体见类注释里的 GAIN_SLEW */
-    private fun stepGain(rms: Float) {
-        if (!AudioBus.normalize) {
-            gain = 1f
-            target = 1f
+    /**
+     * 每首歌只定一次目标：前 [MEASURE_MS] 毫秒累积长时 RMS，测够就锁死。
+     *
+     * 测量期每 0.5 秒用**累积**长时 RMS 刷一次候选（不是单块瞬时值，所以候选是
+     * 单调收敛的），gain 平滑跟着走；锁定后 `fixedGain` 再也不变，一首歌里
+     * 音量只在开头过渡一次，播起来之后恒定。`rms` 一律取放大前的原始 PCM。
+     */
+    private fun updateGain(rms: Float, peak: Int, blockMs: Float, normalize: Boolean) {
+        if (!normalize) {
+            // 关掉时持续清状态，重新打开就会重新测，不会捡起关之前的半截测量
+            resetMeasure()
             return
         }
-        blocks++
-        if (rms >= SILENCE && blocks % GAIN_WINDOW == 0) {
-            target = (TARGET_RMS / rms).coerceIn(MIN_GAIN, MAX_GAIN)
+
+        if (!locked && rms >= SILENCE) {
+            rmsSqSum += rms.toDouble() * rms
+            validBlocks++
+            measureMs += blockMs
+            if (peak > maxPeak) maxPeak = peak
+            val done = validBlocks >= MIN_MEASURE_BLOCKS && measureMs >= MEASURE_MS
+            if (validBlocks % GAIN_WINDOW == 0 || done) {
+                val longRms = sqrt(rmsSqSum / validBlocks).toFloat()
+                // 天花板按测量窗口的最大峰值再加一档余量：一次算好，播放期兜底几乎不触发
+                val ceiling = PEAK_LIMIT / (maxPeak.coerceAtLeast(1) * PEAK_MARGIN)
+                fixedGain = (TARGET_RMS / longRms)
+                    .coerceIn(MIN_GAIN, MAX_GAIN)
+                    .coerceAtMost(ceiling)
+                if (done) {
+                    locked = true
+                    // 只落一次「这首歌测出来要乘多少」，确认均衡真的在工作
+                    if (!loggedGain) {
+                        loggedGain = true
+                        log("响度均衡 锁定 ×%.2f（长时 RMS %.3f）".format(fixedGain, longRms))
+                    }
+                }
+            }
         }
-        gain += (target - gain) * GAIN_SLEW
-        // 落一次「稳下来之后到底给了多少增益」，用来确认均衡真的在工作。
-        // 只落一次：每首歌都打一行会把 diag.log 冲掉
-        if (!loggedGain && blocks >= 200) {
-            loggedGain = true
-            log("响度均衡 增益 ×%.2f".format(gain))
+
+        // 按块时长折算，20ms 的块正好挪 3%；块大小不固定时过渡时间才不会忽快忽慢
+        val a = (1f - Math.pow(
+            1.0 - GAIN_SLEW.toDouble(),
+            (blockMs / 20f).toDouble(),
+        ).toFloat()).coerceIn(GAIN_SLEW, 0.25f)
+        gain += (fixedGain - gain) * a
+
+        // 峰值保护：guard 是「要让 peak × gain 不削波，得把增益乘多少」。
+        // 慢起更慢落，鼓点级瞬态拉不动它。0.29.1 逐块硬钳 room，鼓点每来一下
+        // 音量就掉一截再弹回，那是「突然变大变小」最直接的来源。
+        val need = (PEAK_LIMIT / (peak * gain + 1f)).coerceAtMost(1f)
+        guard += if (need < guard) {
+            (need - guard) * GUARD_ATTACK
+        } else {
+            (1f - guard) * GUARD_RELEASE
+        }
+
+        // 只在实际音量动了大步时留一行。锁定后这里应当安静——
+        // 万一哪天又有人说「音量自己变」，这几行就是第一手证据。
+        val g = gain * guard
+        val now = SystemClock.elapsedRealtime()
+        if (abs(g - lastLoggedG) >= 0.02f && now - lastGainLogAt >= 1000L) {
+            lastGainLogAt = now
+            lastLoggedG = g
+            log("响度 变化 ×%.2f（目标 %.2f / 峰值保护 %.2f）".format(g, fixedGain, guard))
         }
     }
 

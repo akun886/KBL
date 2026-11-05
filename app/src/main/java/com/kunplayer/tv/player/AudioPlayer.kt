@@ -79,6 +79,9 @@ class AudioPlayer(
     }
 
     fun play(url: String, startMs: Long = 0L) {
+        // 换歌（含备用 CDN 重播）要重新测这一首的响度。seek / 暂停恢复不走这里，
+        // 那两处保持已锁定的增益，否则拖一次进度条音量就会变
+        tap.newTrack()
         val source = ProgressiveMediaSource.Factory(dataSourceFactory)
             .createMediaSource(MediaItem.fromUri(url))
         exo.setMediaSource(source)
