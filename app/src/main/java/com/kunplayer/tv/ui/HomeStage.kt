@@ -14,6 +14,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.kunplayer.tv.R
+import com.kunplayer.tv.cache.RecCache
 import com.kunplayer.tv.diag.Diag
 import com.kunplayer.tv.model.Track
 import com.kunplayer.tv.net.CollectionApi
@@ -137,6 +138,7 @@ class HomeStage(
     private val barArtist: TextView = activity.findViewById(R.id.home_bar_artist)
     private val barLyric: TextView = activity.findViewById(R.id.home_bar_lyric)
     private val barSpectrum: SpectrumView = activity.findViewById(R.id.home_bar_spectrum)
+    private val barPaneBox: View = activity.findViewById(R.id.home_bar_pane)
     private val barFav: ImageView = activity.findViewById(R.id.home_bar_fav)
     private val barPrev: ImageView = activity.findViewById(R.id.home_bar_prev)
     private val barPlay: ImageView = activity.findViewById(R.id.home_bar_play)
@@ -198,7 +200,15 @@ class HomeStage(
      * 统一成同一个类型，渲染就只有一条路。
      */
     private val cache = HashMap<Dest, List<Track>>()
-    private var dest = Dest.MUSIC
+
+    /**
+     * 冷启动落在「推荐音乐」。这一页是「随机听点没听过的」，也是每天开机第一眼
+     * 该待的地方；焦点跟着 dest 走，进界面就在侧栏第一项上。
+     */
+    private var dest = Dest.REC_MUSIC
+
+    /** 冷启动只认第一次进这一页：读盘顶上去，不重新搜。之后每次主动进来照旧换一批 */
+    private var recBootstrapped = false
 
     /**
      * 推荐池。推荐音乐与推荐 UP 主**共用同一次拉取**——
@@ -235,6 +245,18 @@ class HomeStage(
     private var barLyricKey = Long.MIN_VALUE
     private var barLineAt = -2
     private var barLyricJob: Job? = null
+
+    /** 底栏那一行显示词还是频谱 */
+    private enum class BarPane { LYRIC, SPECTRUM }
+
+    /**
+     * null = 自动档：有词给词，没词给频谱。用户按一下切换格才落成显式的一档；
+     * 换歌时清回 null，这一首没词就仍然默认停在频谱，不会把上一首的选择带过来。
+     */
+    private var barPane: BarPane? = null
+
+    private fun effectiveBarPane(): BarPane =
+        barPane ?: if (barLines.isNotEmpty()) BarPane.LYRIC else BarPane.SPECTRUM
 
     val isShowing: Boolean get() = root.visibility == View.VISIBLE
 
@@ -304,6 +326,15 @@ class HomeStage(
         // 于是歌词会静静停在那里、超长部分直接被裁掉——「滚动显示」就没了
         barLyric.isSelected = true
 
+        // 歌词 / 频谱切换格：确认轮换，左右也轮换。它不进底栏那排横向键的链子，
+        // 从歌名按下来才进得去、按上回歌名——老路径一格都不多走
+        barPaneBox.setOnClickListener { cycleBarPane() }
+        barPaneBox.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) Diag.enter("底栏 歌词/频谱")
+        }
+        bar.viewTreeObserver.addOnGlobalLayoutListener { sizeBarSpectrum() }
+
+        paintPaneHint()
         paintBar()
     }
 
@@ -444,13 +475,22 @@ class HomeStage(
             return
         }
 
-        // 「推荐音乐」每次进来都重抽关键词、重新搜。
+        // 「推荐音乐」：冷启动先端出上一次换的那一批，不自动重搜。
         //
-        // 这一页不留缓存，也不留保鲜期：需求就是「每次进入换一批」，拿缓存顶上
-        // 用户只会觉得按了没反应。代价是每次要等两三秒（三路搜索串行），
-        // 所以先把「正在取」写出来——这三秒里屏上还是上一页的歌，或者按「换一批」
-        // 之前的那一批，不变的是底下那行字和新结果一到就整屏换掉。
+        // 开机第一眼要的是「昨天那批还在」，不是先空两三秒再整屏换掉；重搜是
+        // 用户主动要的，入口是「换一批」和在侧栏上再确认一次。只有从没换过
+        // （读盘为空）才在冷启动拉一次——一屏空白比等两秒更糟。之后每次主动
+        // 进来仍重抽关键词，换到新的一批随手落盘。
         if (d == Dest.REC_MUSIC) {
+            if (!recBootstrapped) {
+                recBootstrapped = true
+                val last = RecCache.load(activity)
+                if (last.isNotEmpty()) {
+                    renderRecommend(Dest.REC_MUSIC, last)
+                    if (focusList) focusList()
+                    return
+                }
+            }
             loadLong(focusRefresh = !focusList, focusListAfter = focusList)
             return
         }
@@ -561,6 +601,8 @@ class HomeStage(
                 return@launch
             }
             renderRecommend(Dest.REC_MUSIC, got)
+            // 这一批就是「上一次的刷新结果」：下次冷启动直接端上屏
+            RecCache.save(activity, got)
             if (focusListAfter && got.isNotEmpty()) focusList()
         }
     }
@@ -871,13 +913,13 @@ class HomeStage(
     }
 
     /**
-     * 底栏那行字：有词就滚动显示当前这一句，没词就换成小频谱。
+     * 底栏那行字：显示词还是频谱，由切换格那一档说了算；没词时自动档也落在频谱。
      *
      * 只在这句变了的时候改 `text`。TextView 的跑马灯在文本被重新赋值时会从头再滚一遍，
      * 每 500ms 赋一次等于永远停在第一个字上。
      */
     private fun paintBarLyric(posMs: Long) {
-        if (barLines.isEmpty()) {
+        if (effectiveBarPane() == BarPane.SPECTRUM || barLines.isEmpty()) {
             barLyric.visibility = View.GONE
             barSpectrum.visibility = if (playback.hasTrack()) View.VISIBLE else View.GONE
             barSpectrum.playing = playback.isPlaying()
@@ -912,10 +954,13 @@ class HomeStage(
         barLyricJob?.cancel()
         barLines = emptyList()
         barLineAt = -2
+        // 换歌回到自动档：这一首没词就默认频谱，不把上一首翻到的那一档带过来
+        barPane = null
         barLyric.text = ""
         barLyric.visibility = View.GONE
         barSpectrum.visibility = View.VISIBLE
         barSpectrum.playing = playback.isPlaying()
+        paintPaneHint()
         // 匿名拿不到字幕。这里不写提示：底栏只有一行 16dp 的位置，
         // 写「登录后有歌词」会把歌手名挤掉，而播放页右栏已经说过一次了
         if (!LoginApi.isLoggedIn()) return
@@ -927,14 +972,61 @@ class HomeStage(
             if (barLyricKey != key) return@launch
             barLines = (got as? LyricsApi.Outcome.Ok)?.lines.orEmpty()
             barLineAt = -2
-            if (barLines.isEmpty()) {
-                barSpectrum.visibility = View.VISIBLE
-                barLyric.visibility = View.GONE
-            } else {
-                barSpectrum.visibility = View.GONE
-                barLyric.visibility = View.VISIBLE
-                paintBarLyric(playback.snapshot().positionMs)
-            }
+            paintPaneHint()
+            paintBarLyric(playback.snapshot().positionMs)
+        }
+    }
+
+    /**
+     * 切换格：歌词 ⇄ 频谱。没有歌词时这一档没东西可看，按下去只回一句提示，
+     * 不翻进一屏空白——「无歌词默认显示频谱」不是「无歌词还能翻到歌词」。
+     */
+    private fun cycleBarPane() {
+        if (playback.currentTrack() == null) {
+            hint(activity.getString(R.string.home_bar_empty))
+            return
+        }
+        val cur = effectiveBarPane()
+        if (barLines.isEmpty() && cur == BarPane.SPECTRUM) {
+            hint(activity.getString(R.string.bar_no_lyrics))
+            Diag.confirm("底栏 这首歌没有歌词")
+            return
+        }
+        barPane = if (cur == BarPane.LYRIC) BarPane.SPECTRUM else BarPane.LYRIC
+        paintPaneHint()
+        paintBarLyric(playback.snapshot().positionMs)
+        Diag.confirm("底栏 → ${if (barPane == BarPane.LYRIC) "歌词" else "频谱"}")
+    }
+
+    /** contentDescription 只报当前这一档，读屏用；屏幕上不写字 */
+    private fun paintPaneHint() {
+        barPaneBox.contentDescription = activity.getString(
+            if (effectiveBarPane() == BarPane.LYRIC) R.string.bar_pane_lyrics
+            else R.string.bar_pane_spectrum
+        )
+    }
+
+    /**
+     * 频谱宽度 = 歌手左沿到「上一首」左沿的三分之二，再按这一格实际剩下的宽度封顶。
+     *
+     * 写死 dp 值不行：歌手名长到 180dp 时，剩下的地方比一个固定的宽条还窄，
+     * 柱子会直接压到按钮上。量真实坐标还能让以后改底栏边距时不必回来改一个数。
+     * 只在布局完成后跑；宽度没变就不重新设 layoutParams，免得自己和自己来回触发布局。
+     */
+    private fun sizeBarSpectrum() {
+        val from = IntArray(2)
+        val to = IntArray(2)
+        barArtist.getLocationInWindow(from)
+        barPrev.getLocationInWindow(to)
+        val span = to[0] - from[0]
+        if (span <= 0) return
+        val box = barSpectrum.parent as? View ?: return
+        val width = minOf(span * 2 / 3, box.width)
+        if (width <= 0) return
+        val lp = barSpectrum.layoutParams
+        if (lp.width != width) {
+            lp.width = width
+            barSpectrum.layoutParams = lp
         }
     }
 
@@ -954,6 +1046,8 @@ class HomeStage(
             barLyric.text = ""
             barLyric.visibility = View.GONE
             barSpectrum.visibility = View.GONE
+            barPane = null
+            paintPaneHint()
             barCover.setImageDrawable(null)
             barPlay.setImageResource(R.drawable.ic_play)
             barFav.visibility = View.INVISIBLE
@@ -1174,7 +1268,16 @@ class HomeStage(
         // RecyclerView 的纵向滚动整个停摆（实测一屏六行按不动）。
         // 行内的关系由这一行自己管，纵向仍旧留给 RecyclerView。
         KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
-            if (inList()) moveWithinRow(code) else false
+            when {
+                // 切换格上左右也是「换一档」。只认第一下：按住不放时系统每 50ms
+                // 补发一次 DOWN，照单全收会一口气轮好几圈
+                activity.currentFocus === barPaneBox -> {
+                    if (event.repeatCount == 0) cycleBarPane()
+                    true
+                }
+                inList() -> moveWithinRow(code)
+                else -> false
+            }
         }
         // 侧栏 ⇄ 列表 ⇄ 底栏这三段的交接都得自己接：
         // 交给 FocusFinder，从底栏按上会绕过整屏歌直接回侧栏；从列表顶端按上
@@ -1183,6 +1286,8 @@ class HomeStage(
         KeyEvent.KEYCODE_DPAD_DOWN -> {
             val lastNav = lastNavView()
             when {
+                // 歌名往下：进歌词 / 频谱切换格。这是新开的入口，不占底栏横向那一排
+                activity.currentFocus === barTitle -> barPaneBox.requestFocus()
                 // 「换一批」往下：直接进列表。它只出现在推荐音乐，那一页没有工具条
                 activity.currentFocus === refresh -> focusFirstRow()
                 // 「播放全部」往下：收藏页先过一下新建/删除，其它单直接进列表
@@ -1203,7 +1308,9 @@ class HomeStage(
                     } else {
                         moveVertical(1)
                     }
-                inBar() -> false
+                // 底栏里没有「更下面」的控件。吃掉这一下，免得 FocusFinder
+                // 把光标从播放键拽到下面那条长条切换格上
+                inBar() -> true
                 // 侧栏走到最后一项（账户）再按一下：落到底栏。侧栏和底栏本来就
                 // 是屏幕最左、最底的两条边，从这儿过去是几何上最近的一步
                 lastNav != null && activity.currentFocus === lastNav -> {
@@ -1215,6 +1322,8 @@ class HomeStage(
         }
         KeyEvent.KEYCODE_DPAD_UP -> {
             when {
+                // 切换格往上回歌名，再按一次才离开底栏：一次返回只退一层
+                activity.currentFocus === barPaneBox -> barTitle.requestFocus()
                 // 从底栏往上按原路回去：长按下来的人回原来那一行，
                 // 从侧栏下来的人回侧栏——两拨人不该被塞进同一个落点
                 inBar() -> leaveBar()

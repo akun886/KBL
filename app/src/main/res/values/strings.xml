@@ -54,6 +54,9 @@
 
     <string name="home_bar_empty">还没有在播放的歌</string>
     <string name="home_mode_now">播放模式：%1$s</string>
+    <string name="bar_no_lyrics">这首歌没有歌词</string>
+    <string name="bar_pane_lyrics">歌词</string>
+    <string name="bar_pane_spectrum">频谱</string>
 
     <string name="fav_empty">还没有收藏。在歌曲上按 MENU 键收藏</string>
     <string name="fav_added">已加入收藏</string>
@@ -146,7 +149,7 @@
     <!-- 下一首预告。只有「顺序」模式才画：单曲循环的下一首就是它自己，
          随机的下一首没法预告，写了都是骗人的 -->
     <string name="now_up_next">下一首 · %1$s</string>
-    <string name="now_keys">方向键 移动光标　确认 执行光标上的图标　进度条上左右 快进快退</string>
+    <string name="now_keys">方向键 移动光标　确认 执行图标　进度条左右 快进快退\n右下角 轮换歌词/列表/频谱，列表里按右继续</string>
     <string name="now_lyrics_none">暂无歌词</string>
     <string name="now_lyrics_no_sub">B 站没有为这首歌提供字幕</string>
     <string name="now_lyrics_not_lyric">字幕内容不像是歌词，已隐藏</string>
@@ -156,6 +159,9 @@
     <string name="now_list_count">共 %1$d 首</string>
     <string name="now_list_open">播放列表</string>
     <string name="now_list_close">收起播放列表</string>
+    <!-- 右下角那颗档位键画的是「按下去会到哪一档」，这两条只给读屏与日志用 -->
+    <string name="now_pane_lyrics">切换到歌词</string>
+    <string name="now_pane_spectrum">切换到频谱</string>
     <string name="home_badge_album">合集 %1$d 首</string>
     <string name="player_cover_desc">专辑封面</string>
 

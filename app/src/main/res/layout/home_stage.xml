@@ -437,7 +437,9 @@
                 <!-- 歌手 / 歌词 / 频谱共用一行。
                      歌词从歌手后面空两个字符开始滚动——两个字的距离是「这句话换了一个人说的」
                      的停顿，紧贴着歌手会读成「歌手长这样」。
-                     没有歌词时那块位置放频谱：一条正在播的歌，底下那行只写个歌手太浪费。 -->
+                     没有歌词时那块位置放频谱：一条正在播的歌，底下那行只写个歌手太浪费。
+                     这一格自己是可聚焦的切换位：歌名按下进来，确认或左右在歌词与频谱之间轮换，
+                     按上回歌名。它不进底栏那排横向键的链子，老路径一格都不多走。 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="16dp"
@@ -457,10 +459,16 @@
                         android:textSize="12sp" />
 
                     <FrameLayout
+                        android:id="@+id/home_bar_pane"
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
                         android:layout_marginStart="24dp"
-                        android:layout_weight="1">
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_bar_pane_focus"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:focusableInTouchMode="true"
+                        android:nextFocusUp="@id/home_bar_title">
 
                         <TextView
                             android:id="@+id/home_bar_lyric"
@@ -476,6 +484,9 @@
                             android:textColor="@color/text_secondary"
                             android:textSize="12sp" />
 
+                        <!-- 36dp 只是布局期占位。上屏后按「歌手左沿 → 上一首按钮左沿」
+                             跨度的三分之二重算宽度（HomeStage.sizeBarSpectrum），
+                             并按这一格实际剩余的宽度封顶，歌名再长也不会压到按钮上。 -->
                         <com.kunplayer.tv.ui.SpectrumView
                             android:id="@+id/home_bar_spectrum"
                             android:layout_width="36dp"

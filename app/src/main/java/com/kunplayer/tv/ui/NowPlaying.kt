@@ -115,10 +115,32 @@ class NowPlaying(
      */
     private var lyricNote = 0
 
-    /** 右栏现在翻到哪一页。播放列表与歌词共用一个位置，同时只显示一样 */
-    private enum class Pane { LYRICS, LIST }
+    /**
+     * 右栏的三档：歌词、正在听的那一串、频谱。同一块位置同时只站一样。
+     *
+     * 循环顺序照着用户念的顺序：歌词 → 列表 → 频谱 → 歌词。没有歌词时
+     * 「歌词」这一档本来就没东西可看，循环里跳过，变成频谱 ⇄ 列表两档，
+     * 于是「无歌词默认频谱」和「循环切换」不打架。
+     */
+    private enum class Pane { LYRICS, LIST, SPECTRUM }
 
-    private var pane = Pane.LYRICS
+    /** 冷启动与换歌都先给频谱：歌词要问接口，这一栏不能空着等 */
+    private var pane = Pane.SPECTRUM
+
+    /** 用户有没有自己翻过档。没翻过时歌词一到就按「有词给词、没词给频谱」自动定位 */
+    private var userPicked = false
+
+    /** 从哪一档翻进列表的。收起列表回到这一档，不是一律回歌词 */
+    private var beforeList = Pane.SPECTRUM
+
+    private fun defaultPane(): Pane = if (lyrics.isNotEmpty()) Pane.LYRICS else Pane.SPECTRUM
+
+    /** 下一档。没词时不给「歌词」这一档，免得按一下翻进一屏空白 */
+    private fun nextPane(from: Pane): Pane = when (from) {
+        Pane.LYRICS -> Pane.LIST
+        Pane.LIST -> Pane.SPECTRUM
+        Pane.SPECTRUM -> if (lyrics.isNotEmpty()) Pane.LYRICS else Pane.LIST
+    }
 
     /**
      * 当前这首所在的合集。单曲时是 null。
@@ -156,8 +178,11 @@ class NowPlaying(
         listView.layoutManager = listLayout
         listView.adapter = listAdapter
         listView.itemAnimator = null
-        btnList.setOnClickListener { toggleList() }
+        // 右下角这一颗是右栏的循环档位键：图标画的是「按下去会到哪一档」，
+        // 不写标签也不加第二颗按钮——播放页不为一件事再常驻一块区域
+        btnList.setOnClickListener { cyclePane() }
         listClose.setOnClickListener { closeList() }
+        paintPaneButton()
 
         // 歌手名：这张卡上唯一通向「这个人」的入口
         artist.setOnClickListener { track?.let(onOpenArtist) }
@@ -258,7 +283,9 @@ class NowPlaying(
         albumJob?.cancel()
         album = null
         albumBvid = ""
-        pane = Pane.LYRICS
+        pane = Pane.SPECTRUM
+        userPicked = false
+        paintPaneButton()
         listAdapter.submit(emptyList())
         listView.visibility = View.GONE
         listHead.visibility = View.GONE
@@ -290,6 +317,15 @@ class NowPlaying(
         // 换歌必须清掉跳转预览：否则上一首的「目标位置」会被画到新歌的进度条上
         previewUntil = 0L
         previewMs = 0L
+        // 换歌回到自动档：这一首有词就给词，没词就停在频谱，
+        // 不把上一首手动翻到的那一档带过来。
+        // 例外是「人正在列表里选歌」：列表必须留着，paintTrack → syncCollection
+        // 里的 refreshList() 会把新的一行重绑、焦点钉回正在播那首。
+        // 这时候收掉列表，焦点会落进一块 GONE 的视图，之后每个方向键都像按在空处
+        if (pane != Pane.LIST) {
+            userPicked = false
+            pane = Pane.SPECTRUM
+        }
         paintTrack(track, index)
         loadLyrics(track)
     }
@@ -504,9 +540,11 @@ class NowPlaying(
      * 不是一条只能左右拖的滑杆。
      */
     fun focusPlay() {
-        // 回到播放页就是「听歌」：右栏先给歌词，列表是临时翻过去看的
+        // 回到播放页就是「听歌」：右栏回到自动档（有词给词、没词给频谱），
+        // 列表是临时翻过去看的，不该留在屏上
         if (pane == Pane.LIST) {
-            pane = Pane.LYRICS
+            userPicked = false
+            pane = defaultPane()
             paintRight()
         }
         btnPlay.post { btnPlay.requestFocus() }
@@ -537,6 +575,7 @@ class NowPlaying(
         if (!LoginApi.isLoggedIn()) {
             lyricNote = R.string.now_lyrics_need_login
             lyricLoaded = true
+            if (!userPicked) pane = defaultPane()
             paintRight()
             return
         }
@@ -564,6 +603,8 @@ class NowPlaying(
             }
             lyricLoaded = true
             lyricsView.submit(lyrics)
+            // 没手动翻过档就按这一首的实际情况定位：有词给词，没词留在频谱
+            if (!userPicked) pane = defaultPane()
             paintRight()
         }
     }
@@ -577,27 +618,25 @@ class NowPlaying(
     }
 
     /**
-     * 右栏只画一页：歌词，或者正在听的那一串。
+     * 右栏只画一档：歌词、频谱，或者正在听的那一串。
      *
-     * 两页共用同一块位置，是因为它们回答的是同一件事——「这是哪一首、后面还有哪些」。
+     * 三档共用同一块位置，是因为它们都在回答「这首歌现在是什么样、后面还有哪些」。
      * 并排放会各占半屏，两边都读不全。
      */
     private fun paintRight() {
         val showLyrics = pane == Pane.LYRICS && lyrics.isNotEmpty()
-        // 没有词就上频谱：这一栏不能只剩四个字。歌词还在路上时也一并显示，
-        // 否则每次切歌右边先空两秒，看起来像加载失败
-        val showSpectrum = pane == Pane.LYRICS && !showLyrics
+        // 没词、以及歌词还在路上时都上频谱：这一栏不能空两秒，
+        // 看起来像加载失败。用户自己翻到频谱那一档也是这里画
+        val showSpectrum = pane == Pane.SPECTRUM || (pane == Pane.LYRICS && !showLyrics)
         lyricsView.visibility = if (showLyrics) View.VISIBLE else View.GONE
         spectrum.visibility = if (showSpectrum) View.VISIBLE else View.GONE
-        lyricsEmpty.visibility =
-            if (showSpectrum && lyricLoaded) View.VISIBLE else View.GONE
-        if (lyricsEmpty.visibility == View.VISIBLE) {
-            val note = if (lyricNote != 0) lyricNote else R.string.now_lyrics_none
-            lyricsEmpty.setText(note)
+        // 原因只在「确实没词」时写：频谱是用户自己要的那一档，不必解释
+        val showNote = showSpectrum && lyricLoaded && lyrics.isEmpty()
+        lyricsEmpty.visibility = if (showNote) View.VISIBLE else View.GONE
+        if (showNote) {
+            lyricsEmpty.setText(if (lyricNote != 0) lyricNote else R.string.now_lyrics_none)
         }
 
-        // 列表和歌词轮值：打开列表就把词收干净，关掉再放回来。
-        // 两块同时在屏上，等于把这一页唯一的「阅读区」劈成两半
         val showList = pane == Pane.LIST
         listHead.visibility = if (showList) View.VISIBLE else View.GONE
         listView.visibility = if (showList) View.VISIBLE else View.GONE
@@ -608,7 +647,19 @@ class NowPlaying(
                 ""
             }
         }
+        paintPaneButton()
         if (showLyrics) lyricsView.seekTo(playback.snapshot().positionMs)
+    }
+
+    /** 图标画的是「按下去会到哪一档」，所以档位和歌词一变就要重画 */
+    private fun paintPaneButton() {
+        val (icon, label) = when (nextPane(pane)) {
+            Pane.LYRICS -> R.drawable.ic_pane_lyrics to R.string.now_pane_lyrics
+            Pane.LIST -> R.drawable.ic_nav_queue to R.string.now_list_open
+            Pane.SPECTRUM -> R.drawable.ic_pane_spectrum to R.string.now_pane_spectrum
+        }
+        btnList.setImageResource(icon)
+        btnList.contentDescription = activity.getString(label)
     }
 
     // --------------------------------------------------------- 播放列表
@@ -646,22 +697,37 @@ class NowPlaying(
      */
     fun closeList() {
         if (pane != Pane.LIST) return
-        pane = Pane.LYRICS
+        pane = beforeList
         paintRight()
         btnList.requestFocus()
         Diag.confirm("收起播放列表")
     }
 
-    private fun toggleList() {
-        if (pane == Pane.LIST) {
-            closeList()
-            return
+    /**
+     * 右下角那一颗：歌词 → 列表 → 频谱 → 歌词 循环。
+     * 没词时「歌词」这档不在循环里，于是变成频谱 ⇄ 列表，默认停在频谱。
+     */
+    fun cyclePane() {
+        val from = pane
+        val to = nextPane(from)
+        // 离开列表时焦点必须跟着走：列表与抬头马上 GONE，停在里面的焦点会悬空，
+        // 之后每个方向键都像按在空处
+        if (from == Pane.LIST) btnList.requestFocus()
+        if (to == Pane.LIST) {
+            beforeList = from
+            fillList()
         }
-        fillList()
-        pane = Pane.LIST
+        userPicked = true
+        pane = to
         paintRight()
-        focusCurrentRow()
-        Diag.confirm("打开播放列表")
+        if (to == Pane.LIST) focusCurrentRow()
+        Diag.confirm(
+            "右栏 → " + when (to) {
+                Pane.LYRICS -> "歌词"
+                Pane.LIST -> "播放列表"
+                Pane.SPECTRUM -> "频谱"
+            }
+        )
     }
 
     /**

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 右栏「歌词」档：三行长短不一的字，中间一行内收，读作逐行滚动的歌词。
+     和队列图标的区别是右侧那颗播放三角——这里没有，因为它只是字 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M3.5,6.5 L20.5,6.5 M6,12 L18,12 M3.5,17.5 L15,17.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="1.8" />
+</vector>

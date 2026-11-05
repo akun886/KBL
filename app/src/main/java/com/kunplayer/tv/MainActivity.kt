@@ -608,6 +608,13 @@ class MainActivity : Activity() {
                 if (stage.isSeekFocused) {
                     stage.nudge(SEEK_STEP_MS)
                     true
+                } else if (stage.isListOpen() && stage.isListFocused()) {
+                    // 右栏档位循环的续按。进列表后光标钉在正在播那一行，
+                    // 从那儿绕回右下角档位键要按五六下——有歌词时「频谱」档
+                    // 会变成实际够不着的一档。右键在列表行上原本无处可去，
+                    // 拿它继续轮换，不占任何老路径
+                    stage.cyclePane()
+                    true
                 } else {
                     false
                 }
