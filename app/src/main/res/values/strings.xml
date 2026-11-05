@@ -185,6 +185,10 @@
     <string name="color_green">绿</string>
     <string name="color_pink">粉</string>
     <string name="color_white">白</string>
+    <string name="color_red">红</string>
+    <string name="color_blue">蓝</string>
+    <string name="color_gray_light">浅灰</string>
+    <string name="color_gray_mid">中灰</string>
 
     <!-- 按返回键退出应用时的一次确认。电视上没有「关闭」按钮，返回键就是唯一出口，
          直接退太容易误触，问第二次是最轻的拦截 -->

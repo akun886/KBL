@@ -26,6 +26,7 @@ import com.kunplayer.tv.net.LoginApi
 import com.kunplayer.tv.net.SearchApi
 import com.kunplayer.tv.player.PlaybackController
 import com.kunplayer.tv.player.QueueMode
+import com.kunplayer.tv.ui.ColorPalette
 import com.kunplayer.tv.ui.CoverLoader
 import com.kunplayer.tv.ui.FavFolderPanel
 import com.kunplayer.tv.ui.FollowingPanel
@@ -112,6 +113,7 @@ class MainActivity : Activity() {
     private lateinit var favFolderPanel: FavFolderPanel
     private lateinit var followingPanel: FollowingPanel
     private lateinit var spacePanel: SpacePanel
+    private lateinit var colorPalette: ColorPalette
 
     private lateinit var keypad: Keypad
     private lateinit var login: QrLogin
@@ -238,9 +240,17 @@ class MainActivity : Activity() {
         // 四项设置都是「按一下换一个值」。不给每一行单独做开关控件：
         // 电视上左右键改值、确认键换值，两种操作落到同一个结果，行本身就是一个开关
         findViewById<View>(R.id.set_style_row).setOnClickListener { cycleStyle() }
-        findViewById<View>(R.id.set_color_row).setOnClickListener { cycleColor() }
+        // 颜色这一行是例外：十色轮一圈要按八下，所以确认键改成开色板一次看全。
+        // 左右键仍然逐个轮——老用户的手指已经在那个键上，路径不变
+        findViewById<View>(R.id.set_color_row).setOnClickListener { colorPalette.show() }
         findViewById<View>(R.id.set_norm_row).setOnClickListener { toggleNormalize() }
         findViewById<View>(R.id.set_bg_row).setOnClickListener { toggleBackground() }
+        colorPalette = ColorPalette(
+            activity = this,
+            onPick = ::pickColor,
+            // 面板一关，里面的格子随面板一起 GONE，焦点必须交回入口那一行
+            onClosed = { findViewById<View>(R.id.set_color_row).requestFocus() },
+        )
         paintSettings()
 
         favFolderPanel = FavFolderPanel(
@@ -440,6 +450,9 @@ class MainActivity : Activity() {
         if (followingPanel.isShowing) return followingPanel.handleKey(code)
         if (favFolderPanel.isShowing) return favFolderPanel.handleKey(code)
         if (accountPanel.visibility == View.VISIBLE) {
+            // 色板压在设置页上面：它开着的时候按键先归它。
+            // 返回也只收色板——进了色板要按好几下才能退出去，等于把「退出」变成改色
+            if (colorPalette.isShowing) return colorPalette.handleKey(event)
             if (code == KeyEvent.KEYCODE_BACK) {
                 closeAccount()
                 return true
@@ -1004,6 +1017,9 @@ class MainActivity : Activity() {
     }
 
     private fun closeAccount() {
+        // 色板是这一页的子层：整页退掉时它必须一起收，否则下次进设置页会先看到
+        // 一张残留色板，且焦点落在那一层上
+        colorPalette.dismiss()
         accountPanel.visibility = View.GONE
         if (playerOpen) toCover() else home.returnFocus()
     }
@@ -1080,7 +1096,7 @@ class MainActivity : Activity() {
         )
         val ci = Settings.colorIndex(this)
         setColorVal.setText(colorLabel(ci))
-        // 色点就是那一档颜色本身。只写「紫」不够——六种颜色各有各的名字，
+        // 色点就是那一档颜色本身。只写「紫」不够——十来种颜色各有各的名字，
         // 而用户要选的是「看起来对不对」，不是「这个词叫什么」
         setColorDot.backgroundTintList = ColorStateList.valueOf(Settings.COLORS[ci])
         setNormVal.setText(if (Settings.normalize(this)) R.string.settings_on else R.string.settings_off)
@@ -1093,6 +1109,10 @@ class MainActivity : Activity() {
         3 -> R.string.color_green
         4 -> R.string.color_pink
         5 -> R.string.color_white
+        6 -> R.string.color_red
+        7 -> R.string.color_blue
+        8 -> R.string.color_gray_light
+        9 -> R.string.color_gray_mid
         else -> R.string.color_cyan
     }
 
@@ -1118,6 +1138,26 @@ class MainActivity : Activity() {
 
     private fun cycleColor() {
         val v = Settings.cycleColor(this)
+        applyColor(v)
+    }
+
+    /**
+     * 色板上点了一格。
+     *
+     * 与 [cycleColor] 走同一条收尾：存值、刷新这一行的色点、两处频谱一起换色。
+     * 只是这里不弹提示条——人在色板里刚点完，屏幕上那两处频谱就在眼前变，
+     * 再飘一行「频谱颜色：紫」是把已经发生的事说一遍。
+     */
+    private fun pickColor(i: Int) {
+        Settings.setColor(this, i)
+        paintSettings()
+        stage.refreshSpectrum()
+        home.refreshSpectrum()
+        Diag.confirm("频谱颜色 → $i")
+    }
+
+    /** 换色之后的重画。样式与颜色两处共用，省得两边各写一遍再走神 */
+    private fun applyColor(v: Int) {
         paintSettings()
         stage.refreshSpectrum()
         home.refreshSpectrum()

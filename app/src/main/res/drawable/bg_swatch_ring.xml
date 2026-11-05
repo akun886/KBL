@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 「当前用的是这一颗」的外圈。
+     画在圆点外面一圈、留 3dp 空的环，不和焦点底板抢同一件事：
+     焦点回答「光标在哪」，这个环回答「现在是哪个」。两者会同时出现。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#00000000" />
+    <stroke
+        android:width="2dp"
+        android:color="#F2FFFFFF" />
+</shape>

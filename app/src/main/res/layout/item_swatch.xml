@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 色板里的一格：一个圆点，外面套一圈「当前」的环。
+     环和点分两层，因为圆点是运行时染色的——同一个 View 上再叠描边，
+     染色会把描边一起染成那个颜色，环就看不见了。 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="76dp"
+    android:layout_height="76dp"
+    android:background="@drawable/bg_swatch_slot"
+    android:clickable="true"
+    android:focusable="true"
+    android:focusableInTouchMode="true">
+
+    <View
+        android:id="@+id/swatch_ring"
+        android:layout_width="66dp"
+        android:layout_height="66dp"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_swatch_ring"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/swatch_dot"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_circle_white" />
+</FrameLayout>

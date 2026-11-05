@@ -19,10 +19,14 @@ object Settings {
     const val STYLE_COUNT = 3
 
     /**
-     * 频谱可选的六种颜色。
+     * 频谱可选的十种颜色，色板按这个顺序铺。
      *
      * 全是高明度、高饱和的色：频谱画在封面模糊后的深底上，暗色（深蓝、墨绿）会整块糊进
-     * 背景里，看起来像没画。白色留在最后一个——它是「不挑颜色」的那个选项。
+     * 背景里，看起来像没画。后三个是中性色——白色是「不挑颜色」的那一档，
+     * 两级灰给不想让频谱抢封面的人。
+     *
+     * **前六个的下标不能动。** 存的是下标不是色值，重排等于把老用户已经选好的颜色
+     * 换成另一种。新色一律追加在末尾。
      */
     val COLORS = intArrayOf(
         0xFF35D6E8.toInt(), // 青
@@ -31,6 +35,10 @@ object Settings {
         0xFF4ADE80.toInt(), // 绿
         0xFFFF6FA5.toInt(), // 粉
         0xFFF2F2F5.toInt(), // 白
+        0xFFFA233B.toInt(), // 品牌红（与 accent 同值）
+        0xFF4D8DFF.toInt(), // 蓝
+        0xFFC6C6CC.toInt(), // 浅灰
+        0xFF8A8A90.toInt(), // 中灰
     )
 
     @Volatile
@@ -72,6 +80,13 @@ object Settings {
     }
 
     fun color(c: Context): Int = COLORS[colorIndex(c)]
+
+    /** 色板上直接点一格。越界的下标一律夹住，不让坏值写进偏好 */
+    fun setColor(c: Context, index: Int) {
+        val v = index.coerceIn(0, COLORS.size - 1)
+        colorCache = v
+        pref(c).edit().putInt("spectrum_color", v).apply()
+    }
 
     fun cycleColor(c: Context): Int {
         val next = (colorIndex(c) + 1) % COLORS.size

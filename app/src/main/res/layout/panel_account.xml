@@ -244,4 +244,46 @@
         android:layout_marginBottom="18dp"
         android:textColor="@color/text_secondary"
         android:textSize="13sp" />
+
+    <!-- 色板。盖在这一页上面，不是另开一页：颜色是从「频谱颜色」那一行点开的，
+         跳到另一页去选，回来还得再认一遍自己选的是哪个频谱。
+
+         一屏十格、一次看完：颜色是「看」出来的，不是「数」出来的——
+         原来左右键一个个轮，选最后一个要按八下，还得记住刚才停在哪。
+
+         没有「确定」：按下哪一格就已经生效了，再要一次确认只是让人多点一下。
+         选错也只要再点一次，代价一样。 -->
+    <FrameLayout
+        android:id="@+id/palette_scrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#B8000000"
+        android:clickable="true"
+        android:focusable="false"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/palette_card"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_picker"
+            android:clickable="true"
+            android:focusable="false"
+            android:orientation="vertical"
+            android:paddingStart="22dp"
+            android:paddingTop="20dp"
+            android:paddingEnd="22dp"
+            android:paddingBottom="20dp">
+
+            <!-- 两行五列，行与行由 ColorPalette 按 COLORS 的个数自己铺 -->
+            <LinearLayout
+                android:id="@+id/palette_grid"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:focusable="false"
+                android:gravity="center_horizontal"
+                android:orientation="vertical" />
+        </LinearLayout>
+    </FrameLayout>
 </FrameLayout>
