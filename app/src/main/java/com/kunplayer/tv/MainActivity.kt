@@ -394,7 +394,9 @@ class MainActivity : Activity() {
             home.show(focusPlaying = false, focusSidebar = false)
             spacePanel.focusBack()
         } else {
-            home.show(focusPlaying = true)
+            // 从播放页退回来：焦点落在底栏「正在收听」上（还在播的那首的封面），
+            // 在那儿展开一条大频谱，比把眼睛扔进三十行列表里更接得上刚才那一眼
+            home.show(focusOnNowPlaying = true)
         }
     }
     // ------------------------------------------------------------------ 按键总入口

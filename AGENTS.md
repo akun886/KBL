@@ -307,6 +307,16 @@ overlay_login > overlay_following > overlay_fav_folder > panel_account
   从那儿绕回右下角档位键要按五六下——有歌词时「频谱」这一档就变成实际够不着的。
   `playerKey` 的 `DPAD_RIGHT` 在 `isListOpen() && isListFocused()` 时调 `cyclePane()`；
   右键在列表行上原本无处可去（上去是封面、右键自己什么也不做），拿它续按不占老路径。
+- **「正在收听」聚焦态：歌名与歌手让位给一条大频谱**（0.29.6 起）。
+  从播放页按返回退到首页时，焦点落在底栏封面（`HomeStage.focusNowPlaying()`），
+  此刻歌名收起、歌手那一行让位，整块换成一条频谱：高度量歌名的真实高度
+  （`barTitle.height`），左沿是歌名原来的起点（封面右边 14dp），右沿到「上一首」之前。
+  `barArtistRow` 用 **INVISIBLE 而不是 GONE**：保留那 16dp 占位，整块高度与常态一致，
+  底栏的垂直居中不挪，频谱正好顶在歌名原来那一条上（用 GONE 会让整块缩矮、重心下沉约 10dp）。
+  **触发锚点是封面，不是歌名**：歌名是可聚焦的 TextView，一边握着焦点一边把它藏掉，
+  焦点就悬空了；封面本来就是「这首歌」的那一格，藏它没意义。大频谱态里按右先把歌名
+  放回来再落到歌名上——歌名此刻是 GONE 的，交给 FocusFinder 会跳过它直奔「上一首」。
+  `barBigSpectrum.playing` 跟着播放状态走，暂停就停手。
 - **底栏的落点与返回路径要自己接**（0.22.0 起）。三条路进底栏：
   列表里**按住下键**（`repeatCount >= 8`，或带 `FLAG_LONG_PRESS`）、
   列表末尾按下、侧栏走到最后一项再按下。

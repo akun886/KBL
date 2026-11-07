@@ -138,6 +138,8 @@ class HomeStage(
     private val barArtist: TextView = activity.findViewById(R.id.home_bar_artist)
     private val barLyric: TextView = activity.findViewById(R.id.home_bar_lyric)
     private val barSpectrum: SpectrumView = activity.findViewById(R.id.home_bar_spectrum)
+    private val barArtistRow: View = activity.findViewById(R.id.home_bar_artist_row)
+    private val barBigSpectrum: SpectrumView = activity.findViewById(R.id.home_bar_spectrum_big)
     private val barPaneBox: View = activity.findViewById(R.id.home_bar_pane)
     private val barFav: ImageView = activity.findViewById(R.id.home_bar_fav)
     private val barPrev: ImageView = activity.findViewById(R.id.home_bar_prev)
@@ -258,6 +260,18 @@ class HomeStage(
     private fun effectiveBarPane(): BarPane =
         barPane ?: if (barLines.isNotEmpty()) BarPane.LYRIC else BarPane.SPECTRUM
 
+    /**
+     * 底栏「正在收听」聚焦态：焦点落在封面时，歌名与歌手收起，那一块让给一条大频谱。
+     *
+     * 只在封面（这一首的入口）上触发，不在歌名上触发：歌名自己就是可聚焦的 TextView，
+     * 一边让它握着焦点一边把它藏掉，焦点就悬空了。封面本来就是「这首歌」的那一格，
+     * 藏它没意义，也不必藏。
+     */
+    private var barBig = false
+
+    /** 歌名那一行的实际高度（px）。大频谱的高度按它来，量不到就给 24dp 兜底 */
+    private var titleBandH = 0
+
     val isShowing: Boolean get() = root.visibility == View.VISIBLE
 
     init {
@@ -289,33 +303,41 @@ class HomeStage(
         // 底栏这一排现在是七个焦点位：封面、歌名、上一首、播放、下一首、模式、收藏。
         // 0.21 之前中间三颗是裸 ImageView，没有 clickable、代码里也从没引用过——
         // 长得像按钮却按不动，是电视上最坏的一种误导。
+        // 每个焦点位都顺手刷一次「正在收听」聚焦态：焦点在封面时歌名/歌手让位给大频谱。
         barCoverBox.setOnClickListener { openPlayerOrHint() }
         barCoverBox.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) Diag.enter("底栏 封面")
+            updateBarNowPlayingMode()
         }
         barTitle.setOnClickListener { openPlayerOrHint() }
         barTitle.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) Diag.enter("底栏 歌名")
+            updateBarNowPlayingMode()
         }
         barPrev.setOnClickListener { stepQueue(-1) }
         barPrev.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) Diag.enter("底栏 上一首")
+            updateBarNowPlayingMode()
         }
         barPlay.setOnClickListener { toggleFromBar() }
         barPlay.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) Diag.enter("底栏 播放")
+            updateBarNowPlayingMode()
         }
         barNext.setOnClickListener { stepQueue(1) }
         barNext.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) Diag.enter("底栏 下一首")
+            updateBarNowPlayingMode()
         }
         barMode.setOnClickListener { cycleModeFromBar() }
         barMode.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) Diag.enter("底栏 模式")
+            updateBarNowPlayingMode()
         }
         barFav.setOnClickListener { toggleFavorite(playback.currentTrack()) }
         barFav.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) Diag.enter("底栏 收藏")
+            updateBarNowPlayingMode()
         }
 
         // 收藏夹管理只对「我的收藏」这一页有意义
@@ -331,8 +353,13 @@ class HomeStage(
         barPaneBox.setOnClickListener { cycleBarPane() }
         barPaneBox.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) Diag.enter("底栏 歌词/频谱")
+            updateBarNowPlayingMode()
         }
-        bar.viewTreeObserver.addOnGlobalLayoutListener { sizeBarSpectrum() }
+        bar.viewTreeObserver.addOnGlobalLayoutListener {
+            sizeBarSpectrum()
+            // 常态下记一次歌名那一行的真实高度：进聚焦态时按它给大频谱定高
+            if (!barBig && barTitle.height > 0) titleBandH = barTitle.height
+        }
 
         paintPaneHint()
         paintBar()
@@ -919,6 +946,14 @@ class HomeStage(
      * 每 500ms 赋一次等于永远停在第一个字上。
      */
     private fun paintBarLyric(posMs: Long) {
+        // 聚焦态下那一行整个让给大频谱了，这里只负责把大频谱跟上播放状态，
+        // 别再把手底下那条小频谱或歌词拽回可见——不然两套东西会打架
+        if (barBig) {
+            barLyric.visibility = View.GONE
+            barSpectrum.visibility = View.GONE
+            barBigSpectrum.playing = playback.isPlaying()
+            return
+        }
         if (effectiveBarPane() == BarPane.SPECTRUM || barLines.isEmpty()) {
             barLyric.visibility = View.GONE
             barSpectrum.visibility = if (playback.hasTrack()) View.VISIBLE else View.GONE
@@ -940,6 +975,70 @@ class HomeStage(
         }
     }
 
+    // ------------------------------------------------------------ 底栏「正在收听」聚焦态
+
+    /**
+     * 焦点一进一出都过这里：焦点落在封面（正在收听那首的入口）上，就切到大频谱态。
+     * 没有在播的歌时不切——空底栏摆一条频谱是在演。
+     */
+    private fun updateBarNowPlayingMode() {
+        setBarBig(activity.currentFocus === barCoverBox && playback.hasTrack())
+    }
+
+    private fun setBarBig(on: Boolean) {
+        if (barBig == on) return
+        barBig = on
+        applyBarBigMode()
+    }
+
+    /**
+     * 大频谱态：歌名、歌手/歌词/频谱那一行收起，整块让给一条频谱。
+     * 高度对齐歌名那一行（量它的真实高度），左沿是歌名原来的起点（封面之后），
+     * 右沿到「上一首」之前——所以它比常态那条小频谱更宽，也更醒目。
+     */
+    private fun applyBarBigMode() {
+        if (barBig) {
+            val h = barTitle.height.takeIf { it > 0 }
+                ?: titleBandH.takeIf { it > 0 }
+                ?: (24 * activity.resources.displayMetrics.density).toInt()
+            val lp = barBigSpectrum.layoutParams
+            if (lp.height != h) {
+                lp.height = h
+                barBigSpectrum.layoutParams = lp
+            }
+            barTitle.visibility = View.GONE
+            // 歌手行用 INVISIBLE 而不是 GONE：留着它那 16dp 的占位，整块高度就和常态
+            // 一模一样，底栏的垂直居中不挪动，大频谱正好顶在歌名原来那一条上
+            barArtistRow.visibility = View.INVISIBLE
+            barSpectrum.visibility = View.GONE
+            barLyric.visibility = View.GONE
+            barBigSpectrum.visibility = if (playback.hasTrack()) View.VISIBLE else View.GONE
+            barBigSpectrum.playing = playback.isPlaying()
+        } else {
+            barBigSpectrum.visibility = View.GONE
+            barTitle.visibility = View.VISIBLE
+            barArtistRow.visibility = View.VISIBLE
+            // 常态那一行交还给原来的「歌词 / 频谱」逻辑重新画
+            paintBarLyric(playback.snapshot().positionMs)
+        }
+    }
+
+    /**
+     * 把焦点交给底栏那段「正在收听」。
+     *
+     * 从播放页退回来时落在这儿：眼睛刚离开整屏播放，落点该是「还在播的那首」的封面，
+     * 而不是三十行列表里的某一行。没有在播的歌就退回列表，列表也没有就回侧栏。
+     */
+    fun focusNowPlaying() {
+        bar.post {
+            when {
+                playback.hasTrack() && barCoverBox.isShown -> barCoverBox.requestFocus()
+                rowCount() > 0 -> focusList()
+                else -> focusNav()
+            }
+        }
+    }
+
     /**
      * 拉当前这首的歌词给底栏用。
      *
@@ -958,8 +1057,10 @@ class HomeStage(
         barPane = null
         barLyric.text = ""
         barLyric.visibility = View.GONE
-        barSpectrum.visibility = View.VISIBLE
+        // 聚焦态下这一行已经让给大频谱，别再把它那条小频谱翻上来
+        barSpectrum.visibility = if (barBig) View.GONE else View.VISIBLE
         barSpectrum.playing = playback.isPlaying()
+        barBigSpectrum.playing = playback.isPlaying()
         paintPaneHint()
         // 匿名拿不到字幕。这里不写提示：底栏只有一行 16dp 的位置，
         // 写「登录后有歌词」会把歌手名挤掉，而播放页右栏已经说过一次了
@@ -1031,6 +1132,7 @@ class HomeStage(
     /** 设置里改过频谱样式或颜色：底栏与列表行都重取一次外观 */
     fun refreshSpectrum() {
         barSpectrum.applySettings()
+        barBigSpectrum.applySettings()
         adapter.notifyDataSetChanged()
     }
 
@@ -1039,6 +1141,11 @@ class HomeStage(
         paintMode(playback.mode)
 
         if (track == null) {
+            // 没有在播的歌就退回常态：空底栏摆一条大频谱是在演
+            barBig = false
+            barTitle.visibility = View.VISIBLE
+            barArtistRow.visibility = View.VISIBLE
+            barBigSpectrum.visibility = View.GONE
             barTitle.text = activity.getString(R.string.home_bar_empty)
             barArtist.text = ""
             barLyric.text = ""
@@ -1068,7 +1175,8 @@ class HomeStage(
             barCover.setImageDrawable(null)
         }
         paintBarFavorite(FavState.isFavorited(activity, track.bvid))
-        barSpectrum.playing = playback.isPlaying()
+        barSpectrum.playing = playing
+        barBigSpectrum.playing = playing
     }
 
     /**
@@ -1220,7 +1328,11 @@ class HomeStage(
 
     // ------------------------------------------------------------ 显隐 / 按键
 
-    fun show(focusPlaying: Boolean = false, focusSidebar: Boolean = true) {
+    fun show(
+        focusPlaying: Boolean = false,
+        focusSidebar: Boolean = true,
+        focusOnNowPlaying: Boolean = false,
+    ) {
         root.visibility = View.VISIBLE
         if (rowCount() == 0) {
             select(dest, focusList = false)
@@ -1230,10 +1342,11 @@ class HomeStage(
         }
         paintBar()
 
-        if (focusPlaying && rowCount() > 0) {
-            focusList()
-        } else if (focusSidebar) {
-            navBox.post { focusNav() }
+        when {
+            // 从播放页退回来：焦点落在「还在播的那首」上（底栏封面），并在那儿展开大频谱
+            focusOnNowPlaying -> focusNowPlaying()
+            focusPlaying && rowCount() > 0 -> focusList()
+            focusSidebar -> navBox.post { focusNav() }
         }
     }
 
@@ -1267,6 +1380,16 @@ class HomeStage(
         // 行内的关系由这一行自己管，纵向仍旧留给 RecyclerView。
         KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
             when {
+                // 大频谱态（焦点在封面）里往右：先把歌名放回来再落上去。歌名此刻是
+                // GONE 的，交给 FocusFinder 会直接跳过它落到「上一首」，想看歌名的人
+                // 就永远得绕一圈
+                activity.currentFocus === barCoverBox && code == KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (event.repeatCount == 0) {
+                        setBarBig(false)
+                        barTitle.requestFocus()
+                    }
+                    true
+                }
                 // 切换格上左右也是「换一档」。只认第一下：按住不放时系统每 50ms
                 // 补发一次 DOWN，照单全收会一口气轮好几圈
                 activity.currentFocus === barPaneBox -> {
