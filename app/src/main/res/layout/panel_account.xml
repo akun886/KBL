@@ -844,7 +844,7 @@
                 android:orientation="horizontal"
                 android:visibility="gone">
 
-                <EditText
+                <com.kunplayer.tv.ui.ImeEditText
                     android:id="@+id/kw_ime_input"
                     android:layout_width="0dp"
                     android:layout_height="44dp"

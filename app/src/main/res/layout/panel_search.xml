@@ -27,18 +27,72 @@
         android:paddingEnd="14dp"
         android:paddingBottom="14dp">
 
-        <!-- 输入回显。空的时候是占位提示（灰色），有字时白色 -->
-        <TextView
-            android:id="@+id/search_field"
+        <!-- 输入行：左回显、右切换。
+
+             九宫格只能拼 a-z，中文词一个都打不出来——电视自带的搜狗支持拼音，
+             所以默认落在输入法上，九宫格留作「按几下就走」的短词场景。
+             两套同时留着，用右边那颗按钮说清楚现在用哪套；
+             不做「自动猜你想用哪个」，猜错一次就得删掉重来。 -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:fontFamily="sans-serif-medium"
-            android:maxLines="1"
-            android:paddingStart="4dp"
-            android:paddingBottom="6dp"
-            android:textColor="@color/text_primary"
-            android:textSize="21sp" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1">
+
+                <!-- 九宫格档的回显。空的时候是占位提示（灰色），有字时白色 -->
+                <TextView
+                    android:id="@+id/search_field"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:paddingStart="4dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="21sp" />
+
+                <!-- 输入法档的真输入框。两档叠在同一格里，切换只翻 visibility，
+                     上面的 1dp 细线、底下的历史与键盘都不用跟着挪位置 -->
+                <com.kunplayer.tv.ui.ImeEditText
+                    android:id="@+id/search_ime_input"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:background="@drawable/bg_chip"
+                    android:hint="@string/search_placeholder"
+                    android:imeOptions="actionSearch"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_secondary"
+                    android:textSize="18sp"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/search_ime_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_play_all"
+                android:clickable="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="@string/kw_use_ime"
+                android:textColor="@color/play_all_text"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <View
             android:layout_width="match_parent"
@@ -87,6 +141,7 @@
              卡片要浮在键盘之上、又不能让键盘让位，只有叠层做得到。
              Keypad 通过 container.parent 找它，换成普通 LinearLayout 就弹不出来 -->
         <FrameLayout
+            android:id="@+id/search_keypad_box"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp">
