@@ -44,6 +44,9 @@ import com.kunplayer.tv.ui.NowPlaying
 import com.kunplayer.tv.ui.QrLogin
 import com.kunplayer.tv.ui.ScrollableLayoutManager
 import com.kunplayer.tv.ui.SpacePanel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import com.kunplayer.tv.ui.TrackListAdapter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -1277,7 +1280,10 @@ class MainActivity : Activity() {
         rowBg.setOnClickListener { toggleBackground() }
         rowMine.setOnClickListener {
             showPage(SetPage.MINE)
-            if (LoginApi.isLoggedIn() && accountUser.isEmpty()) refreshAccountName()
+            // 每次进来都问一次服务端，不再只在「名字还空着」时刷。
+            // 会员身份会变（续费、到期、电视端开通），而它只在 nav 里；
+            // 只刷一次的话，一个人续了费、或到期了，在这台机器上永远显示旧的那一档
+            if (LoginApi.isLoggedIn()) refreshAccountName()
         }
 
         setStyleVal = findViewById(R.id.set_style_val)
@@ -1878,18 +1884,45 @@ class MainActivity : Activity() {
     }
 
     /**
-     * 会员身份那一行写什么。
+     * 会员身份那一行写什么。分三种，不是两种。
      *
-     * 优先用 nav 自己给的 label（「年度大会员」「大会员」这类原话）——按 status
-     * 拼词分不出年度和月度，还会在「大会员但已过期」时写错。label 缺失时才退回
-     * status/vipStatus 的粗判断；两者都没有就写「普通用户」，这是真实的信息，
-     * 不是占位符。
+     * 生效中：优先用 nav 自己给的 label（「年度大会员」「大会员」这类原话）——
+     * 按 status 拼词分不出年度和月度。label 缺了才按 type 兜底。
+     *
+     * **开通过但已过期**：这是第三种，绝不能塞回「普通用户」。B 站的 nav 在到期后
+     * 仍然留着 `vip.type`（1 月度 / 2 年度）和 `due_date`，只把 `status` 归零、
+     * 把 `label.text` 清空（2026-11 真机：type=1、status=0、due_date=2026-07-23）。
+     * 照旧逻辑写「普通用户」等于把「你确实是大会员、只是到期了」这件事抹掉，
+     * 用户在 App 里看着自己的大会员标，到这儿变成普通用户，结论只能是
+     * 「这个应用认不出会员」。
+     *
+     * 从来没开通过才写「普通用户」，这是真实信息，不是占位符。
      */
     private fun vipTextOf(nav: NavData): String {
-        val label = nav.vip?.label?.text.orEmpty().trim()
-        if (label.isNotEmpty()) return label
-        val active = nav.vipStatus == 1 || (nav.vip?.status ?: 0) == 1
-        return getString(if (active) R.string.account_vip_member else R.string.account_vip_normal)
+        val vip = nav.vip
+        val label = vip?.label?.text.orEmpty().trim()
+        val active = nav.vipStatus == 1 || (vip?.status ?: 0) == 1
+        if (active) {
+            if (label.isNotEmpty()) return label
+            return getString(
+                if ((vip?.type ?: 0) >= 2) R.string.account_vip_year else R.string.account_vip_member
+            )
+        }
+        if ((vip?.type ?: 0) > 0) {
+            val due = vip?.dueDate ?: 0L
+            // due_date 是毫秒。拿不到就只写「已过期」，别编一个日期上去
+            val day = if (due > 0) {
+                SimpleDateFormat("yyyy-MM-dd", Locale.CHINA).format(Date(due))
+            } else {
+                ""
+            }
+            return if (day.isEmpty()) {
+                getString(R.string.account_vip_expired)
+            } else {
+                getString(R.string.account_vip_expired_on, day)
+            }
+        }
+        return getString(R.string.account_vip_normal)
     }
 
     // ------------------------------------------------------------------ 杂项
