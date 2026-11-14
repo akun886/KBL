@@ -2,7 +2,6 @@ package com.kunplayer.tv.net
 
 import com.kunplayer.tv.model.ApiResp
 import com.kunplayer.tv.model.AudioPick
-import com.kunplayer.tv.model.DashData
 import com.kunplayer.tv.model.FingerData
 import com.kunplayer.tv.model.NavData
 import com.kunplayer.tv.model.PlayUrlData
@@ -138,11 +137,15 @@ object BiliApi {
     // -------------------------------------------------------------- 5. 选音轨
 
     /**
-     * 优先级：FLAC → 普通音频里码率最高的。
+     * 优先级：FLAC → 普通音频里码率最高（或按用户选的音质档封顶）。
      * 故意跳过 Dolby：小米电视4A 这颗 Amlogic T962 没有 EC-3 授权解码器，
      * 选它只会换来一段沉默，而且失败得很安静，很难查。
+     *
+     * @param quality 0 自动 / 1 无损 / 2 高品质 / 3 标准 / 4 流畅。数字与
+     *                [com.kunplayer.tv.cache.Settings] 一致——网络层不引 Context，
+     *                档位由调用方读好再传进来。
      */
-    fun pickAudio(data: PlayUrlData, log: (String) -> Unit): AudioPick {
+    fun pickAudio(data: PlayUrlData, quality: Int, log: (String) -> Unit): AudioPick {
         val dash = data.dash ?: throw BiliException("响应里没有 dash")
 
         dash.audio?.forEach {
@@ -155,8 +158,9 @@ object BiliApi {
             log("  Dolby 音轨 ${it.bandwidth / 1000}kbps（本机无 EC-3 解码，跳过）")
         }
 
+        // 「自动」和「无损」都先看 FLAC：能拿下无损就没有理由要更低的
         val flac = dash.flac?.audio
-        if (flac != null && flac.baseUrl.isNotEmpty()) {
+        if (quality <= 1 && flac != null && flac.baseUrl.isNotEmpty()) {
             return AudioPick(
                 kind = "FLAC",
                 url = flac.baseUrl,
@@ -165,10 +169,23 @@ object BiliApi {
             )
         }
 
-        val best: DashData = dash.audio.orEmpty()
+        // 每次选档都记一条：用户报「选了流畅还是很大」时，日志里能直接看到
+        // 接口到底给了哪几条轨、最终挑了哪条
+        val cap = when (quality) {
+            4 -> 80_000          // 流畅：30216 ≈ 64k
+            3 -> 140_000         // 标准：30232 ≈ 132k
+            2 -> 200_000         // 高品质：30280 ≈ 192k
+            else -> Int.MAX_VALUE
+        }
+        val playable = dash.audio.orEmpty()
             .filter { it.baseUrl.isNotEmpty() && it.mimeType != "audio/eac3" }
-            .maxByOrNull { it.bandwidth }
-            ?: throw BiliException("dash.audio 为空，或全部条目无 base_url")
+        if (playable.isEmpty()) throw BiliException("dash.audio 为空，或全部条目无 base_url")
+
+        // 封顶之后取最高；这一档要是一条都没有（老稿件只给一条），退回全局最高，
+        // 不能因为「没有 64k 的轨」就放不出声
+        val best = playable.filter { it.bandwidth <= cap }.maxByOrNull { it.bandwidth }
+            ?: playable.maxByOrNull { it.bandwidth }!!
+        log("  选轨 档位=$quality 上限=${if (cap == Int.MAX_VALUE) "无" else cap / 1000} kbps → ${best.bandwidth / 1000}kbps")
 
         return AudioPick(
             kind = "普通音频",

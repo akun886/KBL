@@ -257,7 +257,7 @@ QQ 音乐 TV 版的双栏。
 
 ## 按键与层级
 
-两层主线（首页 / 播放页）+ 浮层（搜索、我的、扫码、收藏夹、关注列表、作者主页）。谁在最上层，按键就归谁。
+两层主线（首页 / 播放页）+ 浮层（搜索、设置、扫码、收藏夹、关注列表、作者主页）。谁在最上层，按键就归谁。
 
 叠放顺序必须与 `activity_main.xml` 里 include 的**反序**一致：
 
@@ -463,6 +463,48 @@ overlay_login > overlay_following > overlay_fav_folder > panel_account
   用 `track.cid` 去分 P 表里找位置永远找不到；顶层 cid 就是 P1 的 cid。
 - **首页角标要能冷启动后仍在。** 合集信息存在 CollectionApi 的磁盘缓存里（24 小时），
   只查内存的话冷启动后角标全没了；读盘优先在内存没命中时做，别在首屏 30 行上无条件 stat。
+
+## 设置与筛选词（0.30.0）
+
+「我的」已改名为**设置**，里面六行：频谱设置 / 歌词设置 / 音质 / 搜索关键词 / 后台播放 / 我的。
+
+- **六页在同一个 FrameLayout 里叠着，切换只翻 visibility。** `SetPage { ROOT, SPECTRUM, LYRICS,
+  QUALITY, KEYWORDS, MINE }`，六个 View 全在 `panel_account.xml` 里，`showPage()` 一次把六个可见性
+  都写一遍。不用 Fragment、不复用 RecyclerView：每页三四行静态控件，那套机制省的代码比它自己还多。
+- **交焦点必须 post 一层。** 页面刚由 GONE 翻成 VISIBLE，这一帧还没测量，`requestFocus()` 会落空，
+  系统自己挑一个（实测挑中 ScrollView 本身，那一层不画高亮）——屏幕上看起来就是「焦点没了」，
+  之后每个方向键都像按在空处。一律 `target.post { target.requestFocus() }`。
+- **返回一次只退一层，落点必须是进来那一行。** 子页按 BACK 时先 `backTarget = setPage` 再回 ROOT，
+  `showPage(ROOT)` 用 `rowOf(backTarget)` 交焦点；根页按 BACK 才 `closeAccount()` 退出设置、
+  光标回侧栏「设置」。别让 `showPage` 自己推断「刚从哪一页来」——那条推断被别的路径覆盖过，
+  表现是「从我的退出来，光标停在歌词设置」。**从外面重新进设置一律落第一行**
+  （`openAccount()` 里 `backTarget = SPECTRUM`）：上一次的子页是上一次的进度，隔了一次开合还记着它，
+  一进来光标就停在中段某行，像按错了。
+- **值写在右边，不用开关图形。** 三米外看不出 24dp 拨杆是开还是关，「开 / 关」两个字不会看错。
+  行上左右键也改值（`set_lyric_on_row` 等分支）——遥控器用户习惯左右调，只留「确认换一个」
+  会让人摸不清这一页的规律。
+- **色板一个类管两处**（`ColorPalette`，`TARGET_SPECTRUM` / `TARGET_LYRIC`）；收起时按 `setPage`
+  把焦点交回打开它的那一行（`returnToSettingsRow()`）。
+- **关键词只能打 a-z。** 复用九宫格 `Keypad`（B 站搜索吃拼音原文），起手必须清空 buffer——
+  把当前词塞进去就变成「国语yueyu」。
+- **关键词的单一真源是 `Settings.keywords()`**：`search_keywords` 一条存十个、`\n` 分隔、不足补默认。
+  首页那一排按钮和设置里那十行都读它，不另存副本。
+- **作者主页的返回按来源分**（`SpaceFrom { HOME, FOLLOWING, PLAYER }`）：关的时候分别
+  `home.returnFocus()` / `followingPanel.resume()`（按 mid 回原来那一行，不重新 load）/ 回播放页。
+  用一个布尔记「是不是压着播放页」只能区分两种来源，从关注列表进来的那次会被当成从首页进来的，
+  于是退到首页——用户报的「点返回跳回首页」就是这么来的。
+
+首页头图下方那排筛选词（10 个）和「换一批」是同一条取数链的两个入口：
+
+- **点词走 `SearchApi.search(word)`，不走 `searchLong`。** 后者有一小时闸门，
+  「无损」「Hi-Res」这类词会搜出空页——那是长合集的规则，不是筛选的规则。
+- **筛的时候标题换成这个词。** 底下已经是这个词的结果，标题还写「推荐音乐」就是在说假话。
+  「换一批」和重新进这一页都退回 `Dest.REC_MUSIC.title`，同时把高亮落下（`chipAt = -1`），
+  留着高亮会让人以为筛选坏了。
+- **`chipJob` 单独一个 Job，与 `recJob` 互斥**：点词先 `recJob?.cancel()`——长合集回来会把
+  这一屏换成随机那批。
+- **整排放头图下方，不塞标题列。** 380dp 的标题列装不下十个词，真机实测最后一个被裁成半个字。
+- **焦点链手工接**：侧栏首项按右到第一个词，词的 ↑ 回侧栏、↓ 到「播放全部」。
 
 ## 数据源
 

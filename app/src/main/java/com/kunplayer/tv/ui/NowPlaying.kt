@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.kunplayer.tv.R
+import com.kunplayer.tv.cache.Settings
 import com.kunplayer.tv.diag.Diag
 import com.kunplayer.tv.model.Track
 import com.kunplayer.tv.net.CollectionApi
@@ -133,13 +134,15 @@ class NowPlaying(
     /** 从哪一档翻进列表的。收起列表回到这一档，不是一律回歌词 */
     private var beforeList = Pane.SPECTRUM
 
-    private fun defaultPane(): Pane = if (lyrics.isNotEmpty()) Pane.LYRICS else Pane.SPECTRUM
+    private fun defaultPane(): Pane =
+        if (Settings.lyricsOn(activity) && lyrics.isNotEmpty()) Pane.LYRICS else Pane.SPECTRUM
 
     /** 下一档。没词时不给「歌词」这一档，免得按一下翻进一屏空白 */
     private fun nextPane(from: Pane): Pane = when (from) {
         Pane.LYRICS -> Pane.LIST
         Pane.LIST -> Pane.SPECTRUM
-        Pane.SPECTRUM -> if (lyrics.isNotEmpty()) Pane.LYRICS else Pane.LIST
+        Pane.SPECTRUM ->
+            if (Settings.lyricsOn(activity) && lyrics.isNotEmpty()) Pane.LYRICS else Pane.LIST
     }
 
     /**
@@ -624,14 +627,16 @@ class NowPlaying(
      * 并排放会各占半屏，两边都读不全。
      */
     private fun paintRight() {
-        val showLyrics = pane == Pane.LYRICS && lyrics.isNotEmpty()
+        val lyricsAllowed = Settings.lyricsOn(activity)
+        val showLyrics = pane == Pane.LYRICS && lyrics.isNotEmpty() && lyricsAllowed
         // 没词、以及歌词还在路上时都上频谱：这一栏不能空两秒，
         // 看起来像加载失败。用户自己翻到频谱那一档也是这里画
         val showSpectrum = pane == Pane.SPECTRUM || (pane == Pane.LYRICS && !showLyrics)
         lyricsView.visibility = if (showLyrics) View.VISIBLE else View.GONE
         spectrum.visibility = if (showSpectrum) View.VISIBLE else View.GONE
-        // 原因只在「确实没词」时写：频谱是用户自己要的那一档，不必解释
-        val showNote = showSpectrum && lyricLoaded && lyrics.isEmpty()
+        // 原因只在「确实没词」时写：频谱是用户自己要的那一档，不必解释；
+        // 用户自己把歌词关掉的，更不该在这儿抱怨「暂无歌词」
+        val showNote = showSpectrum && lyricLoaded && lyrics.isEmpty() && lyricsAllowed
         lyricsEmpty.visibility = if (showNote) View.VISIBLE else View.GONE
         if (showNote) {
             lyricsEmpty.setText(if (lyricNote != 0) lyricNote else R.string.now_lyrics_none)
@@ -862,6 +867,22 @@ class NowPlaying(
     /** 设置里改过频谱样式或颜色：只重取一次外观，不动这一页的焦点 */
     fun refreshSpectrum() {
         spectrum.applySettings()
+    }
+
+    /**
+     * 设置里改过歌词的颜色 / 字体 / 大小 / 开关。
+     *
+     * 改完立刻重画右栏：人在播放页上改设置时看不见这一页，但改完关掉设置页、
+     * 回来第一眼就该是新样子。关掉歌词时档位也跟着退回频谱——这一栏不能空着。
+     */
+    fun refreshLyrics() {
+        lyricsView.applySettings()
+        if (!Settings.lyricsOn(activity) && pane == Pane.LYRICS) {
+            userPicked = false
+            pane = defaultPane()
+        }
+        paintRight()
+        paintPaneButton()
     }
 
     /**

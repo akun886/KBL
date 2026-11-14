@@ -23,15 +23,19 @@ import com.kunplayer.tv.diag.Diag
  */
 class ColorPalette(
     private val activity: Activity,
-    /** 点了某个颜色（[Settings.COLORS] 的下标）。落盘与刷新预览交给上层 */
-    private val onPick: (Int) -> Unit,
-    /** 面板关掉后把焦点交回「频谱颜色」那一行，否则焦点悬空、遥控器当场失灵 */
+    /** 点了某个颜色：[target] 是哪一处（频谱 / 歌词），[index] 是 [Settings.COLORS] 的下标 */
+    private val onPick: (target: Int, index: Int) -> Unit,
+    /** 面板关掉后把焦点交回进来的那一行，否则焦点悬空、遥控器当场失灵 */
     private val onClosed: () -> Unit,
 ) {
 
-    private companion object {
+    companion object {
+        /** 改的是哪一处颜色。两块地方共用同一套十色，格子只画一份 */
+        const val TARGET_SPECTRUM = 0
+        const val TARGET_LYRIC = 1
+
         /** 一行五格。十色正好两行，屏幕上是一个规整的方块，不是一条长龙 */
-        const val COLS = 5
+        private const val COLS = 5
     }
 
     private val scrim: View = activity.findViewById(R.id.palette_scrim)
@@ -40,7 +44,8 @@ class ColorPalette(
     private val slots = ArrayList<View>()
     private val rings = ArrayList<View>()
 
-    /** 当前用的是哪一格，只用来画外圈 */
+    /** 当前改的是哪一处，以及那一处现在用的是哪一格（只用来画外圈） */
+    private var target = TARGET_SPECTRUM
     private var current = 0
 
     val isShowing: Boolean get() = scrim.visibility == View.VISIBLE
@@ -86,13 +91,24 @@ class ColorPalette(
         }
     }
 
-    fun show() {
-        current = Settings.colorIndex(activity)
+    /**
+     * 打开色板。
+     *
+     * @param forTarget [TARGET_SPECTRUM] 或 [TARGET_LYRIC]。两块地方各有各的当前色，
+     *                  打开时先落在自己那一颗上，改动也只写回自己那一份
+     */
+    fun show(forTarget: Int = TARGET_SPECTRUM) {
+        target = forTarget
+        current = if (forTarget == TARGET_LYRIC) {
+            Settings.lyricsColorIndex(activity)
+        } else {
+            Settings.colorIndex(activity)
+        }
         paintCurrent()
         scrim.visibility = View.VISIBLE
         // 焦点先落在「现在用的那一颗」：先让人看见当前是哪个，再决定换不换
         slots.getOrNull(current)?.requestFocus()
-        Diag.enter("频谱色板")
+        Diag.enter(if (forTarget == TARGET_LYRIC) "歌词色板" else "频谱色板")
     }
 
     /** 只收面板，不动焦点——关设置页时用，紧接着整页就没了 */
@@ -117,8 +133,8 @@ class ColorPalette(
         current = i
         paintCurrent()
         // 先落盘刷预览、再收面板：收完面板焦点已经回到设置行上，
-        // 屏幕上同一瞬间能看到「这一行的色点和频谱一起变了」
-        onPick(i)
+        // 屏幕上同一瞬间能看到「这一行的色点和预览一起变了」
+        onPick(target, i)
         close()
     }
 

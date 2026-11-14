@@ -22,7 +22,27 @@ data class NavData(
     /** 头像。「我的」页要用它，别的地方用不到 */
     val face: String = "",
     val vipStatus: Int = 0,
+    /**
+     * 会员身份。`label.text` 就是 B 站自己那套称呼（「大会员」「年度大会员」），
+     * 比按 status 拼一个词可靠——年度大会员和普通大会员在 status 上都是 1。
+     * 未登录时为 null，这里必须可空：字段缺失不该让整条 nav 解析失败。
+     */
+    val vip: VipInfo? = null,
     @SerialName("wbi_img") val wbiImg: WbiImg? = null,
+)
+
+@Serializable
+data class VipInfo(
+    val type: Int = 0,
+    val status: Int = 0,
+    @SerialName("due_date") val dueDate: Long = 0,
+    val label: VipLabel? = null,
+)
+
+@Serializable
+data class VipLabel(
+    val text: String = "",
+    @SerialName("label_theme") val labelTheme: String = "",
 )
 
 @Serializable

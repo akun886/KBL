@@ -45,6 +45,15 @@ class FollowingPanel(
 
     private val adapter = UserAdapter()
 
+    /**
+     * 上一次光标停在哪个人身上。
+     *
+     * 从这一页点进作者主页、再按返回时，人要回到「刚才那一行」——他不是翻了半天
+     * 列表才决定点谁的。按 mid 记而不是按下标：列表是按关注时间排的，关注一个新人
+     * 之后整张表的下标都会挪位。
+     */
+    private var focusMid = 0L
+
     val isShowing: Boolean get() = panel.visibility == View.VISIBLE
 
     init {
@@ -58,6 +67,31 @@ class FollowingPanel(
         note.setText(R.string.home_loading)
         load()
         Diag.enter("关注列表")
+    }
+
+    /**
+     * 从作者主页退回来：把这一页原样还回去，焦点落回出发的那一行。
+     *
+     * 不重新 load()——那会把整张表重拉一遍、焦点扔回第一行，用户刚看过的人在
+     * 十几行之外，等于每次返回都要重新找一遍。手上还有数据就直接摆回去。
+     */
+    fun resume() {
+        if (adapter.itemCount == 0) {
+            // 没数据（上次没登录 / 拉失败）：走一遍正常加载
+            show()
+            return
+        }
+        panel.visibility = View.VISIBLE
+        val at = adapter.indexOf(focusMid).takeIf { it >= 0 } ?: 0
+        list.post {
+            list.scrollToPosition(at)
+            list.post {
+                val holder = list.findViewHolderForAdapterPosition(at)
+                    ?: list.getChildAt(0)?.let { list.findContainingViewHolder(it) }
+                holder?.itemView?.requestFocus()
+            }
+        }
+        Diag.enter("关注列表-返回")
     }
 
     fun dismiss() {
@@ -119,6 +153,9 @@ class FollowingPanel(
             notifyDataSetChanged()
         }
 
+        /** 某个 mid 现在在第几行。找不到给 -1，调用方回落到第一行 */
+        fun indexOf(mid: Long): Int = items.indexOfFirst { it.mid == mid }
+
         override fun getItemCount(): Int = items.size
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserHolder =
@@ -142,6 +179,10 @@ class FollowingPanel(
             sign.text = user.sign
             sign.visibility = if (user.sign.isEmpty()) View.GONE else View.VISIBLE
             CoverLoader.load(face, user.face.httpsUrl(), 80, 80)
+            itemView.setOnFocusChangeListener { _, hasFocus ->
+                // 进主页再退回来时要钉回这一行，所以每次聚焦都记一下是谁
+                if (hasFocus) focusMid = user.mid
+            }
             itemView.setOnClickListener {
                 Diag.confirm("进入作者主页 ${user.uname}")
                 onOpenSpace(user.mid, user.uname)

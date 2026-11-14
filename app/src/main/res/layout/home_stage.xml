@@ -92,6 +92,26 @@
                     android:text="@string/app_name"
                     android:textColor="@color/text_primary"
                     android:textSize="15sp" />
+
+                <!-- 搜索钮。0.30.0 从侧栏挪到这儿：搜索是「动作」不是「去处」，
+                     摆在十行目的地中间，每天都要在一列「去哪儿听」里找一行「干一件事」。
+                     放在品牌名后面，它就成了随时够得着的常驻入口，侧栏只剩目的地。
+
+                     34dp 圆玻璃，和「换一批」同一份底板；图标是侧栏原来那个放大镜，
+                     一个图标只表示一件事，挪了位置也不换形状。 -->
+                <ImageView
+                    android:id="@+id/home_search"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_marginStart="12dp"
+                    android:background="@drawable/bg_play_all"
+                    android:clickable="true"
+                    android:contentDescription="@string/nav_search"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_nav_search"
+                    android:tint="@color/text_primary" />
             </LinearLayout>
 
             <LinearLayout
@@ -281,6 +301,23 @@
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
+
+            <!-- 十个筛选词。0.30.0 起占的正是原来「随机关键词 · 一小时以上」那一行：
+                 同样一行高度，一句话换成十个能按的入口。
+
+                 放在头图**下面一整行**，不塞在标题列里：标题列只有 380dp 宽，
+                 十个词塞进去会被裁掉最后三个（真机实测过）。这一行铺满右侧内容宽度，
+                 十个词并排还留得下呼吸。
+
+                 词不写死在这里：内容和设置页「搜索关键词」是同一份真源
+                 （Settings.keywords），界面按它现铺。只在「推荐音乐」出现，别处整块 gone。 -->
+            <LinearLayout
+                android:id="@+id/home_chips"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="horizontal"
+                android:visibility="gone" />
 
             <!-- 列头。与 item_track_row 的列宽一一对应，改一处就要改另一处。
                  「推荐 UP 主」那一页的列是头像/名字/曲数，和这份列头对不上，

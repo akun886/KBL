@@ -56,6 +56,64 @@ object Settings {
     @Volatile
     private var barPaneCache = Int.MIN_VALUE
 
+    // ---------------------------------------------------------------- 歌词
+
+    /** 字号四档，倍数作用在 item_lyric 的基准 22sp 上 */
+    const val LYRIC_SIZE_SMALL = 0
+    const val LYRIC_SIZE_NORMAL = 1
+    const val LYRIC_SIZE_LARGE = 2
+    const val LYRIC_SIZE_HUGE = 3
+    const val LYRIC_SIZE_COUNT = 4
+    val LYRIC_SCALES = floatArrayOf(0.85f, 1f, 1.22f, 1.45f)
+
+    /** 字体三档。电视上只有这三套中文字形是稳的，别的名字在部分机型上会回落到默认 */
+    const val LYRIC_FONT_DEFAULT = 0
+    const val LYRIC_FONT_HEI = 1
+    const val LYRIC_FONT_SONG = 2
+    const val LYRIC_FONT_COUNT = 3
+
+    @Volatile
+    private var lyricOnCache = -1
+
+    @Volatile
+    private var lyricColorCache = -1
+
+    @Volatile
+    private var lyricFontCache = -1
+
+    @Volatile
+    private var lyricSizeCache = -1
+
+    @Volatile
+    private var qualityCache = -1
+
+    // ---------------------------------------------------------------- 音质
+
+    const val QUALITY_AUTO = 0
+    const val QUALITY_LOSSLESS = 1
+    const val QUALITY_HIGH = 2
+    const val QUALITY_NORMAL = 3
+    const val QUALITY_LOW = 4
+    const val QUALITY_COUNT = 5
+
+    // ---------------------------------------------------------------- 关键词
+
+    /**
+     * 首页「推荐音乐」那排快速筛选按钮，十个槽位。
+     *
+     * 只放默认值：用户改过的词存在 prefs 里，按下标覆盖。改默认表不影响已存的，
+     * 想回到出厂状态走设置页的「恢复默认」。
+     */
+    val DEFAULT_KEYWORDS = listOf(
+        "国语", "粤语", "纯音乐", "抖音", "无损",
+        "合集", "演唱会", "经典", "精选", "Hi-Res",
+    )
+
+    const val KEYWORD_SLOTS = 10
+
+    @Volatile
+    private var keywordCache: List<String>? = null
+
     private fun pref(c: Context) = c.getSharedPreferences(PREF, Context.MODE_PRIVATE)
 
     fun style(c: Context): Int {
@@ -148,5 +206,133 @@ object Settings {
         val v = value.coerceIn(-1, 2)
         barPaneCache = v
         pref(c).edit().putInt("bar_pane", v).apply()
+    }
+
+    // ---------------------------------------------------------------- 歌词设置
+
+    /**
+     * 是否显示歌词。默认开。
+     *
+     * 关掉不是「不加载」——字幕接口本来就有磁盘缓存，加载那一下不花人任何东西；
+     * 关的是「两个页面都不把歌词摆出来」。这样再打开时不用等第二次请求。
+     */
+    fun lyricsOn(c: Context): Boolean {
+        val cached = lyricOnCache
+        if (cached >= 0) return cached == 1
+        val v = if (pref(c).getBoolean("lyrics_on", true)) 1 else 0
+        lyricOnCache = v
+        return v == 1
+    }
+
+    fun setLyricsOn(c: Context, on: Boolean) {
+        lyricOnCache = if (on) 1 else 0
+        pref(c).edit().putBoolean("lyrics_on", on).apply()
+    }
+
+    /** 歌词颜色，和频谱共用一套十色 */
+    fun lyricsColorIndex(c: Context): Int {
+        val cached = lyricColorCache
+        if (cached >= 0) return cached
+        // 默认白：歌词压在封面模糊底上，只有白色在任何一张封面上都读得清
+        val v = pref(c).getInt("lyrics_color", 5).coerceIn(0, COLORS.size - 1)
+        lyricColorCache = v
+        return v
+    }
+
+    fun lyricsColor(c: Context): Int = COLORS[lyricsColorIndex(c)]
+
+    fun setLyricsColor(c: Context, index: Int) {
+        val v = index.coerceIn(0, COLORS.size - 1)
+        lyricColorCache = v
+        pref(c).edit().putInt("lyrics_color", v).apply()
+    }
+
+    fun lyricsFont(c: Context): Int {
+        val cached = lyricFontCache
+        if (cached >= 0) return cached
+        val v = pref(c).getInt("lyrics_font", LYRIC_FONT_DEFAULT).coerceIn(0, LYRIC_FONT_COUNT - 1)
+        lyricFontCache = v
+        return v
+    }
+
+    /** 循环换字体，返回新档。设置行按一下换一个值，和频谱样式同一种手感 */
+    fun cycleLyricsFont(c: Context): Int {
+        val next = (lyricsFont(c) + 1) % LYRIC_FONT_COUNT
+        lyricFontCache = next
+        pref(c).edit().putInt("lyrics_font", next).apply()
+        return next
+    }
+
+    fun lyricsSize(c: Context): Int {
+        val cached = lyricSizeCache
+        if (cached >= 0) return cached
+        val v = pref(c).getInt("lyrics_size", LYRIC_SIZE_NORMAL).coerceIn(0, LYRIC_SIZE_COUNT - 1)
+        lyricSizeCache = v
+        return v
+    }
+
+    fun cycleLyricsSize(c: Context): Int {
+        val next = (lyricsSize(c) + 1) % LYRIC_SIZE_COUNT
+        lyricSizeCache = next
+        pref(c).edit().putInt("lyrics_size", next).apply()
+        return next
+    }
+
+    fun lyricsScale(c: Context): Float = LYRIC_SCALES[lyricsSize(c)]
+
+    // ---------------------------------------------------------------- 音质
+
+    /**
+     * 0 自动（无损优先，其次最高码率）/ 1 无损 / 2 高品质 / 3 标准 / 4 流畅。
+     *
+     * 存的是档位不是码率：B 站换过一次音频 id 表，存数字迟早对不上。
+     */
+    fun quality(c: Context): Int {
+        val cached = qualityCache
+        if (cached >= 0) return cached
+        val v = pref(c).getInt("quality", QUALITY_AUTO).coerceIn(0, QUALITY_COUNT - 1)
+        qualityCache = v
+        return v
+    }
+
+    fun cycleQuality(c: Context): Int {
+        val next = (quality(c) + 1) % QUALITY_COUNT
+        qualityCache = next
+        pref(c).edit().putInt("quality", next).apply()
+        return next
+    }
+
+    // ---------------------------------------------------------------- 关键词
+
+    /**
+     * 十个筛选词。文件里存一整串（`\n` 分隔），读的时候补齐到十位。
+     *
+     * 补齐而不是丢弃：老版本没有这一项、或者哪天从十个减到六个，
+     * 界面上少了按钮比少了词难查得多。空槽回落到默认词。
+     */
+    fun keywords(c: Context): List<String> {
+        keywordCache?.let { return it }
+        val raw = pref(c).getString("search_keywords", "").orEmpty()
+        val saved = if (raw.isEmpty()) emptyList() else raw.split('\n')
+        val out = (0 until KEYWORD_SLOTS).map { i ->
+            saved.getOrNull(i)?.trim()?.takeIf { it.isNotEmpty() } ?: DEFAULT_KEYWORDS[i]
+        }
+        keywordCache = out
+        return out
+    }
+
+    fun setKeyword(c: Context, index: Int, value: String) {
+        if (index !in 0 until KEYWORD_SLOTS) return
+        val word = value.trim()
+        if (word.isEmpty()) return
+        val next = keywords(c).toMutableList()
+        next[index] = word
+        keywordCache = next
+        pref(c).edit().putString("search_keywords", next.joinToString("\n")).apply()
+    }
+
+    fun resetKeywords(c: Context) {
+        keywordCache = DEFAULT_KEYWORDS
+        pref(c).edit().remove("search_keywords").apply()
     }
 }

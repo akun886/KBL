@@ -5,7 +5,7 @@
 
     <string name="nav_discover">发现</string>
     <string name="nav_search">搜索</string>
-    <string name="nav_account">我的</string>
+    <string name="nav_account">设置</string>
 
     <!-- 首页侧栏 -->
     <string name="nav_music">音乐</string>
@@ -31,9 +31,9 @@
     <string name="home_title_hist">播放历史</string>
 
     <!-- 页头副标题只在承载「布局说不出的约束」时才存在（AGENTS.md Design & Copy Rules）。
-         这两条是真约束：推荐池怎么捞、推荐 UP 按什么排。别的页「播放器队列」「最近听过」
-         这类复述标题的句子已经删掉——标题自己就说明那一页是什么。 -->
-    <string name="home_sub_rec_music">随机关键词 · 一小时以上</string>
+         只留一条：推荐 UP 按什么排。推荐音乐那一句「随机关键词 · 一小时以上」在 0.30.0
+         删掉了——它解释的是「这一页怎么来的」，而这一页缺的是「我只想听粤语」这个动作，
+         那个位置现在是一排筛选词。 -->
     <string name="home_sub_rec_up">按在推荐池里的曲数排</string>
 
     <string name="home_play_all">播放全部</string>
@@ -116,7 +116,10 @@
     <string name="account_guest_sub">登录后可同步收藏、播放历史，并解锁无损音轨</string>
     <string name="account_login">扫码登录</string>
     <string name="account_logout">退出登录</string>
+    <string name="account_switch">切换账号</string>
     <string name="account_logged_sub">收藏与播放历史已与 App 同步</string>
+    <string name="account_vip_normal">普通用户</string>
+    <string name="account_vip_member">大会员</string>
     <string name="account_logout_done">已退出登录</string>
     <!-- 应用名 + 版本名 + 构建号。「我的」页脚用，注意空格与括号都是排版的一部分 -->
     <string name="account_version">%1$s %2$s (%3$d)</string>
@@ -169,17 +172,53 @@
     <string name="account_crash">异常记录 %1$d 份 · 按 MENU 清除</string>
     <string name="account_crash_cleared">异常记录已清除</string>
 
-    <!-- 播放设置。四项，都在「我的」页里，一行一项 -->
-    <string name="settings_title">播放设置</string>
+    <!-- 设置。0.30.0 起是二级：根页六项，每项一页。
+         行上的值都是「现在是什么」，不是「按了会怎样」——电视三米外，
+         读当前状态比读操作说明有用。 -->
+    <string name="settings_root_title">设置</string>
+    <string name="settings_spectrum">频谱设置</string>
+    <string name="settings_lyrics">歌词设置</string>
+    <string name="settings_quality">音质</string>
+    <string name="settings_keywords">搜索关键词</string>
+    <string name="settings_mine">我的</string>
     <string name="settings_style">频谱样式</string>
     <string name="settings_color">频谱颜色</string>
+    <string name="settings_background">后台播放</string>
     <string name="settings_normalize">响度均衡</string>
-    <string name="settings_background">返回桌面后继续播放</string>
+    <string name="settings_lyrics_on">显示歌词</string>
+    <string name="settings_lyrics_color">歌词颜色</string>
+    <string name="settings_lyrics_font">歌词字体</string>
+    <string name="settings_lyrics_size">歌词大小</string>
+    <!-- 预览用的示例句。不是说明文字：它按当前的色/字体/字号现画，
+         用户看的是效果本身 -->
+    <string name="settings_lyrics_preview">这一行就是歌词的样子</string>
+    <string name="settings_keywords_reset">恢复默认</string>
+    <string name="settings_keywords_count">%1$d 个</string>
+    <string name="settings_value_pair">%1$s · %2$s</string>
     <string name="settings_on">开</string>
     <string name="settings_off">关</string>
     <string name="spectrum_bars">柱状</string>
     <string name="spectrum_wave">波形</string>
     <string name="spectrum_ring">环形</string>
+    <string name="lyrics_font_default">默认</string>
+    <string name="lyrics_font_hei">黑体</string>
+    <string name="lyrics_font_song">宋体</string>
+    <string name="lyrics_size_small">小</string>
+    <string name="lyrics_size_normal">标准</string>
+    <string name="lyrics_size_large">大</string>
+    <string name="lyrics_size_huge">特大</string>
+    <string name="quality_auto">自动</string>
+    <string name="quality_lossless">无损</string>
+    <string name="quality_high">高品质</string>
+    <string name="quality_normal">标准</string>
+    <string name="quality_low">流畅</string>
+    <string name="quality_now">音质：%1$s</string>
+    <!-- 关键词编辑浮层。电视上只能打 a-z，而 B 站搜索吃拼音原文 -->
+    <string name="kw_editor_title">关键词 %1$d</string>
+    <string name="kw_editor_hint">输入拼音</string>
+    <string name="kw_saved">关键词 %1$d：%2$s</string>
+    <string name="kw_save">保存</string>
+    <string name="kw_reset_done">关键词已恢复默认</string>
     <string name="color_cyan">青</string>
     <string name="color_violet">紫</string>
     <string name="color_amber">橙</string>

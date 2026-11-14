@@ -2,10 +2,12 @@ package com.kunplayer.tv
 
 import android.app.Activity
 import android.content.res.ColorStateList
+import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.View
 import android.widget.ImageView
@@ -20,6 +22,7 @@ import com.kunplayer.tv.cache.SearchHistory
 import com.kunplayer.tv.cache.Settings
 import com.kunplayer.tv.diag.Crash
 import com.kunplayer.tv.diag.Diag
+import com.kunplayer.tv.model.NavData
 import com.kunplayer.tv.model.Track
 import com.kunplayer.tv.net.BiliApi
 import com.kunplayer.tv.net.LoginApi
@@ -100,15 +103,62 @@ class MainActivity : Activity() {
     private lateinit var accountName: TextView
     private lateinit var accountSub: TextView
     private lateinit var accountBtn: TextView
+    private lateinit var accountSwitch: TextView
     private lateinit var accountDiag: TextView
     private lateinit var accountFace: ImageView
     private lateinit var accountVersion: TextView
+
+    /** 设置页现在是第几层。根页只选类，子页才放具体的行 */
+    private enum class SetPage { ROOT, SPECTRUM, LYRICS, QUALITY, KEYWORDS, MINE }
+
+    private var setPage = SetPage.ROOT
+
+    private lateinit var pageRoot: View
+    private lateinit var pageSpectrum: View
+    private lateinit var pageLyrics: View
+    private lateinit var pageQuality: View
+    private lateinit var pageKeywords: View
+    private lateinit var pageMine: View
+
+    private lateinit var rowSpectrum: View
+    private lateinit var rowLyrics: View
+    private lateinit var rowQuality: View
+    private lateinit var rowKeywords: View
+    private lateinit var rowBg: View
+    private lateinit var rowMine: View
+
+    private lateinit var vSpectrum: TextView
+    private lateinit var vLyrics: TextView
+    private lateinit var vQuality: TextView
+    private lateinit var vKeywords: TextView
+    private lateinit var vBg: TextView
+    private lateinit var vMine: TextView
 
     private lateinit var setStyleVal: TextView
     private lateinit var setColorDot: View
     private lateinit var setColorVal: TextView
     private lateinit var setNormVal: TextView
-    private lateinit var setBgVal: TextView
+    private lateinit var setLyricOnVal: TextView
+    private lateinit var setLyricColorDot: View
+    private lateinit var setLyricColorVal: TextView
+    private lateinit var setLyricFontVal: TextView
+    private lateinit var setLyricSizeVal: TextView
+    private lateinit var lyricPreview: TextView
+    private lateinit var setQualityVal: TextView
+
+    /** 关键词十行。下标就是按钮的位置，两处一一对应 */
+    private val kwRows = ArrayList<View>()
+    private val kwLabels = ArrayList<TextView>()
+
+    private lateinit var kwScrim: View
+    private lateinit var kwTitle: TextView
+    private lateinit var kwEcho: TextView
+    private lateinit var kwReset: View
+    private lateinit var kwKeypad: Keypad
+
+    /** 正在改第几个词。-1 = 浮层没开 */
+    private var kwEditing = -1
+    private var kwBuffer = ""
 
     private lateinit var favFolderPanel: FavFolderPanel
     private lateinit var followingPanel: FollowingPanel
@@ -126,6 +176,9 @@ class MainActivity : Activity() {
     private var accountUser = ""
     private var accountFaceUrl = ""
 
+    /** 会员身份。来自 nav 的 vip.label（「年度大会员」这类原话），未登录为空 */
+    private var accountVip = ""
+
     /** 播放页是不是当前这一页。首页在它下面，所以两页各自只有一份实例 */
     private var playerOpen = false
 
@@ -136,13 +189,18 @@ class MainActivity : Activity() {
     private var keysHintShown = false
 
     /**
-     * 作者主页是不是从播放页点歌手打开的。
+     * 作者主页是从哪儿打开的。
      *
-     * 正常叠放顺序里作者主页在播放页**下面**（它是播放页的来处）。
-     * 从播放页点歌手进去时得反过来盖上去，返回时再退回播放页——
-     * 不然用户会看见「什么都没发生」，底下的音乐却还在放。
+     * 这一页能被三个地方点开：首页列表里的歌手列、关注列表里的人、播放页上的歌手名。
+     * 返回键必须回**来的那一处**——0.29.8 之前不论从哪儿进来都回首页，
+     * 从关注列表点进一个人，返回一下人就被扔回了首页侧栏，还得重新翻一遍关注。
+     *
+     * 这同时决定了它盖在谁上面：从播放页进来时得盖到播放页之上（不然点下去
+     * 屏幕上什么都不变），从首页/关注进来时按 layout 里的自然顺序就够。
      */
-    private var spaceOverPlayer = false
+    private enum class SpaceFrom { HOME, FOLLOWING, PLAYER }
+
+    private var spaceFrom = SpaceFrom.HOME
 
     // ------------------------------------------------------------------ 生命周期
 
@@ -226,30 +284,19 @@ class MainActivity : Activity() {
         accountName = findViewById(R.id.account_name)
         accountSub = findViewById(R.id.account_sub)
         accountBtn = findViewById(R.id.account_btn)
+        accountSwitch = findViewById(R.id.account_switch)
         accountDiag = findViewById(R.id.account_diag)
         accountFace = findViewById(R.id.account_face)
         accountVersion = findViewById(R.id.account_version)
         bindAccountButton()
         paintVersion()
 
-        setStyleVal = findViewById(R.id.set_style_val)
-        setColorDot = findViewById(R.id.set_color_dot)
-        setColorVal = findViewById(R.id.set_color_val)
-        setNormVal = findViewById(R.id.set_norm_val)
-        setBgVal = findViewById(R.id.set_bg_val)
-        // 四项设置都是「按一下换一个值」。不给每一行单独做开关控件：
-        // 电视上左右键改值、确认键换值，两种操作落到同一个结果，行本身就是一个开关
-        findViewById<View>(R.id.set_style_row).setOnClickListener { cycleStyle() }
-        // 颜色这一行是例外：十色轮一圈要按八下，所以确认键改成开色板一次看全。
-        // 左右键仍然逐个轮——老用户的手指已经在那个键上，路径不变
-        findViewById<View>(R.id.set_color_row).setOnClickListener { colorPalette.show() }
-        findViewById<View>(R.id.set_norm_row).setOnClickListener { toggleNormalize() }
-        findViewById<View>(R.id.set_bg_row).setOnClickListener { toggleBackground() }
+        bindSettingsPages()
         colorPalette = ColorPalette(
             activity = this,
             onPick = ::pickColor,
             // 面板一关，里面的格子随面板一起 GONE，焦点必须交回入口那一行
-            onClosed = { findViewById<View>(R.id.set_color_row).requestFocus() },
+            onClosed = { returnToSettingsRow() },
         )
         paintSettings()
 
@@ -259,7 +306,8 @@ class MainActivity : Activity() {
             log = { log(it) },
             hint = { hint(it, autoHide = true) },
             onChanged = { home.invalidate() },
-            onClosed = { home.returnFocus() },
+            // 它是「我的收藏」这一页的工具条，退出来回原地，不是回上一次选过的目的地
+            onClosed = { home.returnFocus(HomeStage.Dest.FAV) },
         )
 
         followingPanel = FollowingPanel(
@@ -267,7 +315,8 @@ class MainActivity : Activity() {
             scope = scope,
             log = { log(it) },
             onOpenSpace = { mid, name -> openSpace(mid, name) },
-            onClosed = { home.returnFocus() },
+            // 返回退出关注列表时，光标回到「关注」这一项——它是这次进来的入口
+            onClosed = { home.returnFocus(HomeStage.Dest.FOLLOW) },
         )
 
         spacePanel = SpacePanel(
@@ -277,7 +326,7 @@ class MainActivity : Activity() {
             log = { log(it) },
             hint = { hint(it, autoHide = true) },
             onOpenPlayer = {
-                if (spaceOverPlayer) {
+                if (spaceFrom == SpaceFrom.PLAYER) {
                     // 从播放页进的主页，又在这儿点了投稿：回播放页看这一首，
                     // 别把人留在主页上——他是从那儿来的
                     backToPlayer()
@@ -285,13 +334,7 @@ class MainActivity : Activity() {
                     openPlayer()
                 }
             },
-            onClosed = {
-                if (spaceOverPlayer) {
-                    backToPlayer()
-                } else {
-                    home.returnFocus()
-                }
-            },
+            onClosed = ::closeSpace,
         )
 
         login = QrLogin(
@@ -442,7 +485,13 @@ class MainActivity : Activity() {
         if (login.isShowing) {
             if (code == KeyEvent.KEYCODE_BACK) {
                 login.dismiss()
-                home.returnFocus()
+                // 登录是从设置页「我的」按出来的：设置页还开着就把焦点还给它，
+                // 别把光标扔到首页侧栏（那看起来像设置页已经关了）
+                if (accountPanel.visibility == View.VISIBLE) {
+                    accountBtn.requestFocus()
+                } else {
+                    home.returnFocus(HomeStage.Dest.ACCOUNT)
+                }
                 return true
             }
             return false
@@ -452,33 +501,37 @@ class MainActivity : Activity() {
         if (followingPanel.isShowing) return followingPanel.handleKey(code)
         if (favFolderPanel.isShowing) return favFolderPanel.handleKey(code)
         if (accountPanel.visibility == View.VISIBLE) {
-            // 色板压在设置页上面：它开着的时候按键先归它。
-            // 返回也只收色板——进了色板要按好几下才能退出去，等于把「退出」变成改色
+            // 色板与关键词键盘都压在设置页上面：它们开着的时候按键先归它们。
+            // 返回也只收最上面那层——进了色板要按好几下才能退出去，
+            // 等于把「退出」变成一次改色
             if (colorPalette.isShowing) return colorPalette.handleKey(event)
+            if (kwScrim.visibility == View.VISIBLE) return kwKey(event)
             if (code == KeyEvent.KEYCODE_BACK) {
-                closeAccount()
+                // 一次返回只退一层：子页先回根页，根页才退出设置。
+                // 退之前把「正在离开的是哪一页」记死：回来时光标必须落在这一页那一行。
+                // 不这么做就得靠 showPage 里的推断，而它在别的路径上被覆盖过，
+                // 表现是「从我的退出来，光标停在歌词设置」这类错位
+                if (setPage != SetPage.ROOT) {
+                    backTarget = setPage
+                    showPage(SetPage.ROOT, focus = true)
+                } else {
+                    closeAccount()
+                }
                 return true
             }
             // 设置行上左右键也改值。遥控器用户习惯左右调，只留「确认一下换一个」
             // 会让这一页摸不清规律——同样一件事有两种手感，不如两种都给
             if (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT) {
                 when (currentFocus?.id) {
-                    R.id.set_style_row -> {
-                        cycleStyle()
-                        return true
-                    }
-                    R.id.set_color_row -> {
-                        cycleColor()
-                        return true
-                    }
-                    R.id.set_norm_row -> {
-                        toggleNormalize()
-                        return true
-                    }
-                    R.id.set_bg_row -> {
-                        toggleBackground()
-                        return true
-                    }
+                    R.id.set_style_row -> { cycleStyle(); return true }
+                    R.id.set_color_row -> { cycleColor(); return true }
+                    R.id.set_norm_row -> { toggleNormalize(); return true }
+                    R.id.set_row_bg -> { toggleBackground(); return true }
+                    R.id.set_lyric_on_row -> { toggleLyrics(); return true }
+                    R.id.set_lyric_color_row -> { cycleLyricsColor(); return true }
+                    R.id.set_lyric_font_row -> { cycleLyricsFont(); return true }
+                    R.id.set_lyric_size_row -> { cycleLyricsSize(); return true }
+                    R.id.set_quality_row -> { cycleQuality(); return true }
                 }
             }
             return false
@@ -559,7 +612,7 @@ class MainActivity : Activity() {
             return false
         }
         // 作者主页从播放页点歌手打开时，它被提到了最上层，按键归它
-        if (playerOpen && spaceOverPlayer && spacePanel.isShowing) {
+        if (playerOpen && spaceFrom == SpaceFrom.PLAYER && spacePanel.isShowing) {
             return spacePanel.handleKey(code)
         }
         // 播放页在作者主页**之上**。作者主页是从这里进来的来处，
@@ -831,10 +884,9 @@ class MainActivity : Activity() {
         // 字母卡是叠在键盘上的独立一层，面板 GONE 带不走它
         keypad.dismissPicker()
         searchPanel.visibility = View.GONE
-        // 退出搜索落回侧栏的「搜索」那一项：返回键只退一层，退完该还在原地。
-        // 交给 home 的默认落点会回到上一次选过的目的地——搜索是 action 项、
-        // 从不成为 dest，光标就跑到别的页上去了
-        if (playerOpen) toCover() else home.returnFocus(HomeStage.Dest.SEARCH)
+        // 退出搜索落回左上角那颗搜索钮：它就是这次进来的入口，「返回只退一层」
+        // 意味着退完该还在原地。搜索不在侧栏里了，不能再按目的地去找落点
+        if (playerOpen) toCover() else home.focusSearch()
     }
 
     /** 键盘往上：点亮结果列表的第一行。列表还空着就停在原地 */
@@ -954,10 +1006,22 @@ class MainActivity : Activity() {
 
     private fun openAccount() {
         accountPanel.visibility = View.VISIBLE
+        // 每次从外面进来都落在第一行：上一次待过的子页是「上一次」的进度，
+        // 隔了一次开合还记着它，人一进来光标就停在中段某行，像是按错了
+        backTarget = SetPage.SPECTRUM
+        showPage(SetPage.ROOT, focus = true)
         paintAccount()
-        accountPanel.post { accountBtn.requestFocus() }
         if (LoginApi.isLoggedIn() && accountUser.isEmpty()) refreshAccountName()
-        Diag.confirm("打开我的")
+        Diag.confirm("打开设置")
+    }
+
+    /** 色板收起后把焦点交回打开它的那一行 */
+    private fun returnToSettingsRow() {
+        val target = when (setPage) {
+            SetPage.LYRICS -> R.id.set_lyric_color_row
+            else -> R.id.set_color_row
+        }
+        findViewById<View>(target).requestFocus()
     }
 
     /**
@@ -991,26 +1055,60 @@ class MainActivity : Activity() {
         }
     }
 
-    /** 作者主页。列表里点歌手、关注列表里点人，都走这里 */
+    /** 作者主页。列表里点歌手、关注列表里点人、播放页上点歌手名，都走这里 */
     private fun openSpace(mid: Long, name: String) {
         if (mid <= 0) {
             hint(getString(R.string.space_no_mid), autoHide = true)
             return
         }
-        // 关注列表让位：两个都是整屏的浮层，同时开着只能看见上面那个
-        followingPanel.dismiss()
+        // 先认来处再动任何东西：后面每一步（收关注、盖播放页）都按这个判断
+        spaceFrom = when {
+            followingPanel.isShowing -> SpaceFrom.FOLLOWING
+            playerOpen -> SpaceFrom.PLAYER
+            else -> SpaceFrom.HOME
+        }
+        // 关注列表让位：两个都是整屏浮层，同时开着只能看见上面那个。
+        // 这里不用 dismissAndReturnFocus——那会把焦点交给首页，而下一步就要盖主页；
+        // 回来时由 resume() 自己把焦点还给原来那一行
+        if (spaceFrom == SpaceFrom.FOLLOWING) followingPanel.dismiss()
         // 从播放页点歌手进来：主页要盖到播放页上面去，看见的才是「人」，
         // 不然点下去屏幕上什么都不变。z-order 在 layout 里是写死的，这里改一次
-        if (playerOpen) {
-            spaceOverPlayer = true
+        if (spaceFrom == SpaceFrom.PLAYER) {
             findViewById<View>(R.id.space_panel).bringToFront()
         }
         spacePanel.show(mid, name)
     }
 
+    /**
+     * 收起作者主页：回它**来的那一层**，焦点也交回那一层。
+     *
+     * 三处来处各有各的「原地」：
+     *   · 播放页 → 回播放页，焦点给播放键；
+     *   · 关注 → 回关注列表，焦点钉回刚点的那一行（人不是翻了半天才决定点谁的）；
+     *   · 首页 → 回首页侧栏。
+     *
+     * 0.29.8 之前这里只有「播放页 / 首页」两种结果：从关注点进一个人再返回，
+     * 人被送回首页侧栏，还得从头再翻一遍关注列表——这就是「返回跳回首页」那个 bug。
+     */
+    private fun closeSpace() {
+        val from = spaceFrom
+        spaceFrom = SpaceFrom.HOME
+        spacePanel.dismiss()
+        when (from) {
+            SpaceFrom.PLAYER -> {
+                playerOverlay.bringToFront()
+                playerOverlay.visibility = View.VISIBLE
+                playerOpen = true
+                stage.focusPlay()
+            }
+            SpaceFrom.FOLLOWING -> followingPanel.resume()
+            SpaceFrom.HOME -> home.returnFocus()
+        }
+    }
+
     /** 收起作者主页，回到播放页。焦点交给播放键——那是这一页唯一的主按钮 */
     private fun backToPlayer() {
-        spaceOverPlayer = false
+        spaceFrom = SpaceFrom.HOME
         spacePanel.dismiss()
         playerOverlay.bringToFront()
         playerOverlay.visibility = View.VISIBLE
@@ -1019,11 +1117,15 @@ class MainActivity : Activity() {
     }
 
     private fun closeAccount() {
-        // 色板是这一页的子层：整页退掉时它必须一起收，否则下次进设置页会先看到
-        // 一张残留色板，且焦点落在那一层上
+        // 子层是这一页的一部分：整页退掉时它们必须一起收，否则下次进设置会先看到
+        // 一张残留色板 / 一块键盘，且焦点落在那一层上
         colorPalette.dismiss()
+        closeKeywordEditor()
+        setPage = SetPage.ROOT
+        showPage(SetPage.ROOT, focus = false)
         accountPanel.visibility = View.GONE
-        if (playerOpen) toCover() else home.returnFocus()
+        // 退出设置：光标回侧栏「设置」这一项，而不是上一次选过的目的地
+        if (playerOpen) toCover() else home.returnFocus(HomeStage.Dest.ACCOUNT)
     }
 
     private fun bindAccountButton() {
@@ -1037,6 +1139,7 @@ class MainActivity : Activity() {
                 .start()
         }
         accountBtn.setOnClickListener { onAccountAction() }
+        accountSwitch.setOnClickListener { switchAccount() }
     }
 
     /**
@@ -1060,9 +1163,12 @@ class MainActivity : Activity() {
 
     private fun paintAccount() {
         if (LoginApi.isLoggedIn()) {
-            accountName.text = accountUser.ifEmpty { getString(R.string.nav_account) }
-            accountSub.text = getString(R.string.account_logged_sub)
+            accountName.text = accountUser.ifEmpty { getString(R.string.account_guest) }
+            // 副标题写会员身份。没拿到 nav（刚启动、或接口挂了）时退回一句状态说明，
+            // 不能空着——空着看起来像「没登录」
+            accountSub.text = accountVip.ifEmpty { getString(R.string.account_logged_sub) }
             accountBtn.text = getString(R.string.account_logout)
+            accountSwitch.visibility = View.VISIBLE
             // 头像。没拿到就整块收起来：一个空圆比「未登录」三个字更像缺图
             if (accountFaceUrl.isEmpty()) {
                 accountFace.visibility = View.GONE
@@ -1074,6 +1180,8 @@ class MainActivity : Activity() {
             accountName.text = getString(R.string.account_guest)
             accountSub.text = getString(R.string.account_guest_sub)
             accountBtn.text = getString(R.string.account_login)
+            // 没登录时「切换账号」和「扫码登录」是同一件事，只留一颗
+            accountSwitch.visibility = View.GONE
             accountFace.visibility = View.GONE
         }
         val crashes = Crash.pending(this)
@@ -1082,27 +1190,208 @@ class MainActivity : Activity() {
         paintSettings()
     }
 
-    // ------------------------------------------------------------------ 播放设置
+    // ------------------------------------------------------------------ 设置
+
+    /** 根页六行 + 五个子页的一次性装配 */
+    private fun bindSettingsPages() {
+        pageRoot = findViewById(R.id.set_page_root)
+        pageSpectrum = findViewById(R.id.set_page_spectrum)
+        pageLyrics = findViewById(R.id.set_page_lyrics)
+        pageQuality = findViewById(R.id.set_page_quality)
+        pageKeywords = findViewById(R.id.set_page_keywords)
+        pageMine = findViewById(R.id.set_page_mine)
+
+        rowSpectrum = findViewById(R.id.set_row_spectrum)
+        rowLyrics = findViewById(R.id.set_row_lyrics)
+        rowQuality = findViewById(R.id.set_row_quality)
+        rowKeywords = findViewById(R.id.set_row_keywords)
+        rowBg = findViewById(R.id.set_row_bg)
+        rowMine = findViewById(R.id.set_row_mine)
+
+        vSpectrum = findViewById(R.id.set_row_spectrum_val)
+        vLyrics = findViewById(R.id.set_row_lyrics_val)
+        vQuality = findViewById(R.id.set_row_quality_val)
+        vKeywords = findViewById(R.id.set_row_keywords_val)
+        vBg = findViewById(R.id.set_row_bg_val)
+        vMine = findViewById(R.id.set_row_mine_val)
+
+        // 根页六行：五行走子页，一行当场翻。
+        // 每一行都只做一件事，所以用「按一下」而不是左右键——左右留给子页里改值
+        rowSpectrum.setOnClickListener { showPage(SetPage.SPECTRUM) }
+        rowLyrics.setOnClickListener { showPage(SetPage.LYRICS) }
+        rowQuality.setOnClickListener { showPage(SetPage.QUALITY) }
+        rowKeywords.setOnClickListener { showPage(SetPage.KEYWORDS) }
+        rowBg.setOnClickListener { toggleBackground() }
+        rowMine.setOnClickListener {
+            showPage(SetPage.MINE)
+            if (LoginApi.isLoggedIn() && accountUser.isEmpty()) refreshAccountName()
+        }
+
+        setStyleVal = findViewById(R.id.set_style_val)
+        setColorDot = findViewById(R.id.set_color_dot)
+        setColorVal = findViewById(R.id.set_color_val)
+        setNormVal = findViewById(R.id.set_norm_val)
+        setLyricOnVal = findViewById(R.id.set_lyric_on_val)
+        setLyricColorDot = findViewById(R.id.set_lyric_color_dot)
+        setLyricColorVal = findViewById(R.id.set_lyric_color_val)
+        setLyricFontVal = findViewById(R.id.set_lyric_font_val)
+        setLyricSizeVal = findViewById(R.id.set_lyric_size_val)
+        lyricPreview = findViewById(R.id.lyric_preview)
+        setQualityVal = findViewById(R.id.set_quality_val)
+        kwReset = findViewById(R.id.kw_reset)
+
+        // 子页里的行：都是「按一下换一个值」，左右键也能换（见 handleKey）
+        findViewById<View>(R.id.set_style_row).setOnClickListener { cycleStyle() }
+        // 颜色这一行是例外：十色轮一圈要按八下，所以确认键改成开色板一次看全
+        findViewById<View>(R.id.set_color_row).setOnClickListener {
+            colorPalette.show(ColorPalette.TARGET_SPECTRUM)
+        }
+        findViewById<View>(R.id.set_norm_row).setOnClickListener { toggleNormalize() }
+        findViewById<View>(R.id.set_lyric_on_row).setOnClickListener { toggleLyrics() }
+        findViewById<View>(R.id.set_lyric_color_row).setOnClickListener {
+            colorPalette.show(ColorPalette.TARGET_LYRIC)
+        }
+        findViewById<View>(R.id.set_lyric_font_row).setOnClickListener { cycleLyricsFont() }
+        findViewById<View>(R.id.set_lyric_size_row).setOnClickListener { cycleLyricsSize() }
+        findViewById<View>(R.id.set_quality_row).setOnClickListener { cycleQuality() }
+        kwReset.setOnClickListener { resetKeywords() }
+
+        buildKeywordRows()
+        buildKeywordEditor()
+    }
 
     /**
-     * 四项设置的值。都是「当前值直接写在右边」，不做开关图形——
-     * 电视三米外看不出一个 24dp 的拨杆是开还是关，而「开 / 关」两个字不会看错。
+     * 切到某一页。
+     *
+     * 五页在同一个 FrameLayout 里叠着，切换就是五个 visibility；不复用 RecyclerView
+     * 也不做 Fragment：每页只有三四行静态控件，那套机制省的代码比它自己还多。
+     *
+     * @param focus 切完把光标放到这一页第一行。返回键回根页时用它——
+     *              不交焦点的话屏幕上一个高亮都没有，之后每个方向键都像按在空处。
+     */
+    private fun showPage(page: SetPage, focus: Boolean = true) {
+        // 从根页进子页时记下是哪一个：按返回时焦点要落回那一行，
+        // 而不是一律回到第一行（人是从第三行进去的，回来还在第三行）
+        if (page != SetPage.ROOT && setPage == SetPage.ROOT) backTarget = page
+        setPage = page
+        pageRoot.visibility = if (page == SetPage.ROOT) View.VISIBLE else View.GONE
+        pageSpectrum.visibility = if (page == SetPage.SPECTRUM) View.VISIBLE else View.GONE
+        pageLyrics.visibility = if (page == SetPage.LYRICS) View.VISIBLE else View.GONE
+        pageQuality.visibility = if (page == SetPage.QUALITY) View.VISIBLE else View.GONE
+        pageKeywords.visibility = if (page == SetPage.KEYWORDS) View.VISIBLE else View.GONE
+        pageMine.visibility = if (page == SetPage.MINE) View.VISIBLE else View.GONE
+        if (!focus) return
+        // 焦点要 post 一层再交：这一页刚由 GONE 翻成 VISIBLE，这一帧还没测量完，
+        // 立刻 requestFocus 会落空——然后系统自己挑一个（实测挑中 ScrollView 本身，
+        // 那一层不画高亮，屏幕上看起来就是「焦点没了」，之后方向键全像按在空处）
+        val target: View? = when (page) {
+            SetPage.ROOT -> rowOf(backTarget)
+            SetPage.SPECTRUM -> findViewById(R.id.set_style_row)
+            SetPage.LYRICS -> findViewById(R.id.set_lyric_on_row)
+            SetPage.QUALITY -> findViewById(R.id.set_quality_row)
+            SetPage.KEYWORDS -> kwRows.firstOrNull()
+            SetPage.MINE -> if (LoginApi.isLoggedIn()) accountSwitch else accountBtn
+        }
+        target?.post { target.requestFocus() }
+        Diag.enter("设置-${page.name}")
+    }
+
+    /** 从子页返回时该回到根页哪一行。记住刚才那一页，人按返回才回得来 */
+    private var backTarget = SetPage.SPECTRUM
+
+    private fun rowOf(page: SetPage): View? = when (page) {
+        SetPage.SPECTRUM -> rowSpectrum
+        SetPage.LYRICS -> rowLyrics
+        SetPage.QUALITY -> rowQuality
+        SetPage.KEYWORDS -> rowKeywords
+        SetPage.MINE -> rowMine
+        SetPage.ROOT -> rowSpectrum
+    }
+
+    /**
+     * 各处的值。「当前值直接写在右边」，不做开关图形——电视三米外看不出
+     * 一个 24dp 的拨杆是开还是关，而「开 / 关」两个字不会看错。
      */
     private fun paintSettings() {
-        setStyleVal.setText(
-            when (Settings.style(this)) {
-                Settings.STYLE_WAVE -> R.string.spectrum_wave
-                Settings.STYLE_RING -> R.string.spectrum_ring
-                else -> R.string.spectrum_bars
-            }
-        )
-        val ci = Settings.colorIndex(this)
-        setColorVal.setText(colorLabel(ci))
+        val style = getString(styleLabel(Settings.style(this)))
+        val color = getString(colorLabel(Settings.colorIndex(this)))
+        val onOff = getString(if (Settings.lyricsOn(this)) R.string.settings_on else R.string.settings_off)
+
+        // 根页：只说「这一类现在是什么」，不重复子页里每一行的值
+        vSpectrum.text = getString(R.string.settings_value_pair, style, color)
+        vLyrics.text = getString(R.string.settings_value_pair, onOff, getString(lyricsSizeLabel()))
+        vQuality.text = getString(qualityLabel(Settings.quality(this)))
+        vKeywords.text = getString(R.string.settings_keywords_count, Settings.KEYWORD_SLOTS)
+        vBg.text = getString(if (Settings.backgroundPlay(this)) R.string.settings_on else R.string.settings_off)
+        vMine.text = if (LoginApi.isLoggedIn() && accountUser.isNotEmpty()) {
+            accountUser
+        } else {
+            getString(R.string.account_guest)
+        }
+
+        // 子页：每一行自己那一项
+        setStyleVal.text = style
+        setColorVal.text = color
         // 色点就是那一档颜色本身。只写「紫」不够——十来种颜色各有各的名字，
         // 而用户要选的是「看起来对不对」，不是「这个词叫什么」
-        setColorDot.backgroundTintList = ColorStateList.valueOf(Settings.COLORS[ci])
-        setNormVal.setText(if (Settings.normalize(this)) R.string.settings_on else R.string.settings_off)
-        setBgVal.setText(if (Settings.backgroundPlay(this)) R.string.settings_on else R.string.settings_off)
+        setColorDot.backgroundTintList = ColorStateList.valueOf(Settings.COLORS[Settings.colorIndex(this)])
+        setNormVal.text = getString(if (Settings.normalize(this)) R.string.settings_on else R.string.settings_off)
+        setLyricOnVal.text = onOff
+        setLyricColorVal.text = getString(colorLabel(Settings.lyricsColorIndex(this)))
+        setLyricColorDot.backgroundTintList =
+            ColorStateList.valueOf(Settings.lyricsColor(this))
+        setLyricFontVal.text = getString(lyricsFontLabel())
+        setLyricSizeVal.text = getString(lyricsSizeLabel())
+        setQualityVal.text = getString(qualityLabel(Settings.quality(this)))
+        paintLyricPreview()
+        paintKeywordValues()
+    }
+
+    private fun styleLabel(v: Int): Int = when (v) {
+        Settings.STYLE_WAVE -> R.string.spectrum_wave
+        Settings.STYLE_RING -> R.string.spectrum_ring
+        else -> R.string.spectrum_bars
+    }
+
+    private fun lyricsFontLabel(): Int = when (Settings.lyricsFont(this)) {
+        Settings.LYRIC_FONT_HEI -> R.string.lyrics_font_hei
+        Settings.LYRIC_FONT_SONG -> R.string.lyrics_font_song
+        else -> R.string.lyrics_font_default
+    }
+
+    private fun lyricsSizeLabel(): Int = when (Settings.lyricsSize(this)) {
+        Settings.LYRIC_SIZE_SMALL -> R.string.lyrics_size_small
+        Settings.LYRIC_SIZE_LARGE -> R.string.lyrics_size_large
+        Settings.LYRIC_SIZE_HUGE -> R.string.lyrics_size_huge
+        else -> R.string.lyrics_size_normal
+    }
+
+    private fun qualityLabel(v: Int): Int = when (v) {
+        Settings.QUALITY_LOSSLESS -> R.string.quality_lossless
+        Settings.QUALITY_HIGH -> R.string.quality_high
+        Settings.QUALITY_NORMAL -> R.string.quality_normal
+        Settings.QUALITY_LOW -> R.string.quality_low
+        else -> R.string.quality_auto
+    }
+
+    /**
+     * 歌词预览。
+     *
+     * 颜色、字体、字号三件事都是「看起来对不对」，而右边的词（白 / 黑体 / 大）
+     * 只能说明改了什么、说明不了改成什么样。这一行按当前设置现画，改一次同屏就能看到。
+     */
+    private fun paintLyricPreview() {
+        lyricPreview.visibility = if (Settings.lyricsOn(this)) View.VISIBLE else View.GONE
+        lyricPreview.setTextColor(Settings.lyricsColor(this))
+        lyricPreview.setTextSize(
+            TypedValue.COMPLEX_UNIT_SP,
+            22f * Settings.lyricsScale(this),
+        )
+        lyricPreview.typeface = when (Settings.lyricsFont(this)) {
+            Settings.LYRIC_FONT_HEI -> Typeface.create("sans-serif", Typeface.NORMAL)
+            Settings.LYRIC_FONT_SONG -> Typeface.create("serif", Typeface.NORMAL)
+            else -> Typeface.DEFAULT
+        }
     }
 
     private fun colorLabel(i: Int): Int = when (i) {
@@ -1146,16 +1435,26 @@ class MainActivity : Activity() {
     /**
      * 色板上点了一格。
      *
-     * 与 [cycleColor] 走同一条收尾：存值、刷新这一行的色点、两处频谱一起换色。
-     * 只是这里不弹提示条——人在色板里刚点完，屏幕上那两处频谱就在眼前变，
-     * 再飘一行「频谱颜色：紫」是把已经发生的事说一遍。
+     * 与 [cycleColor] 走同一条收尾：存值、刷新这一行的色点、该重画的地方一起换色。
+     * 只是这里不弹提示条——人在色板里刚点完，屏幕上那处预览就在眼前变，
+     * 再飘一行「颜色：紫」是把已经发生的事说一遍。
+     *
+     * @param target [ColorPalette.TARGET_SPECTRUM] 改频谱，[ColorPalette.TARGET_LYRIC] 改歌词
      */
-    private fun pickColor(i: Int) {
-        Settings.setColor(this, i)
-        paintSettings()
-        stage.refreshSpectrum()
-        home.refreshSpectrum()
-        Diag.confirm("频谱颜色 → $i")
+    private fun pickColor(target: Int, i: Int) {
+        if (target == ColorPalette.TARGET_LYRIC) {
+            Settings.setLyricsColor(this, i)
+            paintSettings()
+            stage.refreshLyrics()
+            home.refreshLyrics()
+            Diag.confirm("歌词颜色 → $i")
+        } else {
+            Settings.setColor(this, i)
+            paintSettings()
+            stage.refreshSpectrum()
+            home.refreshSpectrum()
+            Diag.confirm("频谱颜色 → $i")
+        }
     }
 
     /** 换色之后的重画。样式与颜色两处共用，省得两边各写一遍再走神 */
@@ -1195,6 +1494,235 @@ class MainActivity : Activity() {
         Diag.confirm("后台播放 → $on")
     }
 
+    // ------------------------------------------------------------------ 歌词设置
+
+    /**
+     * 歌词开关。
+     *
+     * 关掉是把两个页面上「摆歌词」这件事收起来，不是把字幕接口断掉：
+     * 歌词本身有磁盘缓存，留着下次打开是零成本，断掉反而要重新等一次网络。
+     */
+    private fun toggleLyrics() {
+        val on = !Settings.lyricsOn(this)
+        Settings.setLyricsOn(this, on)
+        paintSettings()
+        stage.refreshLyrics()
+        home.refreshLyrics()
+        hint(
+            getString(R.string.settings_lyrics_on) + "：" +
+                getString(if (on) R.string.settings_on else R.string.settings_off),
+            autoHide = true,
+        )
+        Diag.confirm("显示歌词 → $on")
+    }
+
+    /** 左右键逐个轮色。十色一圈要按八下，所以确认键仍然开色板一次看全 */
+    private fun cycleLyricsColor() {
+        val next = (Settings.lyricsColorIndex(this) + 1) % Settings.COLORS.size
+        Settings.setLyricsColor(this, next)
+        paintSettings()
+        stage.refreshLyrics()
+        home.refreshLyrics()
+        Diag.confirm("歌词颜色 → $next")
+    }
+
+    private fun cycleLyricsFont() {
+        val v = Settings.cycleLyricsFont(this)
+        paintSettings()
+        stage.refreshLyrics()
+        home.refreshLyrics()
+        hint(getString(R.string.settings_lyrics_font) + "：" + getString(lyricsFontLabel()), autoHide = true)
+        Diag.confirm("歌词字体 → $v")
+    }
+
+    private fun cycleLyricsSize() {
+        val v = Settings.cycleLyricsSize(this)
+        paintSettings()
+        stage.refreshLyrics()
+        home.refreshLyrics()
+        hint(getString(R.string.settings_lyrics_size) + "：" + getString(lyricsSizeLabel()), autoHide = true)
+        Diag.confirm("歌词大小 → $v")
+    }
+
+    // ------------------------------------------------------------------ 音质
+
+    /**
+     * 换音质档。
+     *
+     * 只作废已经解好的流地址，不打断正在播的这首——切档不该让音乐停一下。
+     * 下一首（或再点同一首）重新取流时按新档选轨，日志里有「选轨 档位=」可以核对。
+     */
+    private fun cycleQuality() {
+        val v = Settings.cycleQuality(this)
+        playback.invalidateStream()
+        paintSettings()
+        hint(getString(R.string.quality_now, getString(qualityLabel(v))), autoHide = true)
+        Diag.confirm("音质 → $v（下一首生效）")
+    }
+
+    // ------------------------------------------------------------- 搜索关键词
+
+    /**
+     * 十行关键词。行模板是 set_row.xml，按 Settings.KEYWORD_SLOTS 铺——
+     * 槽位个数只有一处真源，按钮那排和这一页不会一多一少。
+     */
+    private fun buildKeywordRows() {
+        val box = findViewById<LinearLayout>(R.id.kw_rows)
+        box.removeAllViews()
+        kwRows.clear()
+        kwLabels.clear()
+        for (i in 0 until Settings.KEYWORD_SLOTS) {
+            val row = layoutInflater.inflate(R.layout.set_row, box, false)
+            // 词放在左边主字位：这一页要回答的是「一共十个什么词」，
+            // 序号只在心里对位用，不做主字。右值留空，右边那道箭头说明可以改
+            val label = row.findViewById<TextView>(R.id.set_row_label)
+            row.findViewById<TextView>(R.id.set_row_value).visibility = View.GONE
+            val lp = row.layoutParams as LinearLayout.LayoutParams
+            lp.topMargin = if (i == 0) 0 else (4 * resources.displayMetrics.density).toInt()
+            row.layoutParams = lp
+            row.setOnClickListener { openKeywordEditor(i) }
+            row.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) Diag.enter("关键词 ${i + 1}")
+            }
+            box.addView(row)
+            kwRows += row
+            kwLabels += label
+        }
+    }
+
+    private fun paintKeywordValues() {
+        val words = Settings.keywords(this)
+        kwLabels.forEachIndexed { i, v -> v.text = words.getOrNull(i).orEmpty() }
+    }
+
+    private fun openKeywordEditor(index: Int) {
+        if (index !in 0 until Settings.KEYWORD_SLOTS) return
+        kwEditing = index
+        // 起手是空的：遥控器上只能打 a-z，把「国语」两个字塞进 buffer 之后
+        // 再按字母会变成「国语yueyu」——用户根本删不掉那两个字
+        kwBuffer = ""
+        kwTitle.text = getString(R.string.kw_editor_title, index + 1)
+        paintKeywordEcho()
+        kwKeypad.ensureBuilt()
+        kwKeypad.setInput("")
+        kwScrim.visibility = View.VISIBLE
+        kwScrim.post { kwKeypad.focusFirst() }
+        Diag.enter("关键词编辑 ${index + 1}")
+    }
+
+    /**
+     * 输入回显。空的时候显示这个词现在是什么（灰色），
+     * 有字就显示正在打的串（白色）——和搜索页那个输入框同一个规矩。
+     */
+    private fun paintKeywordEcho() {
+        if (kwBuffer.isEmpty()) {
+            val now = Settings.keywords(this).getOrNull(kwEditing).orEmpty()
+            kwEcho.text = if (now.isEmpty()) getString(R.string.kw_editor_hint) else now
+            kwEcho.setTextColor(getColor(R.color.text_secondary))
+        } else {
+            kwEcho.text = kwBuffer
+            kwEcho.setTextColor(getColor(R.color.text_primary))
+        }
+    }
+
+    private fun closeKeywordEditor() {
+        kwEditing = -1
+        kwBuffer = ""
+        kwScrim.visibility = View.GONE
+    }
+
+    /** 键盘浮层的按键：返回只退这一层，方向键归九宫格 */
+    private fun kwKey(event: KeyEvent): Boolean {
+        val code = event.keyCode
+        if (code == KeyEvent.KEYCODE_BACK) {
+            // 字母卡开着时先收卡：一次返回只退一层
+            if (kwKeypad.dismissPicker()) return true
+            val back = kwRows.getOrNull(maxOf(kwEditing, 0))
+            closeKeywordEditor()
+            back?.requestFocus()
+            return true
+        }
+        if (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT ||
+            code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN
+        ) {
+            if (kwKeypad.contains(currentFocus)) {
+                // 键盘到边界时 move() 返回 false：这一层没有别的东西可去，
+                // 吃掉按键，别让焦点跑到浮层背后的设置页上
+                kwKeypad.move(code)
+                return true
+            }
+            return false
+        }
+        val ch = event.unicodeChar.toChar()
+        if (ch.isLetterOrDigit()) {
+            kwKeypad.type(ch.lowercaseChar())
+            return true
+        }
+        if (code == KeyEvent.KEYCODE_DEL) {
+            kwKeypad.backspace()
+            return true
+        }
+        return false
+    }
+
+    private fun buildKeywordEditor() {
+        kwScrim = findViewById(R.id.kw_scrim)
+        kwTitle = findViewById(R.id.kw_title)
+        kwEcho = findViewById(R.id.kw_echo)
+        kwKeypad = Keypad(
+            container = findViewById(R.id.kw_keypad),
+            onText = {
+                kwBuffer = it
+                paintKeywordEcho()
+            },
+            onSubmit = { saveKeyword(it) },
+            submitLabel = getString(R.string.kw_save),
+            // 四颗功能键铺满一行：空格 / 删除 / 确定 / 取消。
+            // 取消不给返回键当替身——遥控器上那颗键的意思和「这次不改了」不一样，
+            // 一个是退，一个是「我知道我没改」
+            extraLabel = getString(R.string.fav_folder_cancel),
+            onExtra = {
+                val back = kwRows.getOrNull(maxOf(kwEditing, 0))
+                closeKeywordEditor()
+                back?.requestFocus()
+            },
+        )
+    }
+
+    private fun saveKeyword(text: String) {
+        val at = kwEditing
+        val word = text.trim()
+        if (at < 0) {
+            closeKeywordEditor()
+            return
+        }
+        val back = kwRows.getOrNull(at)
+        closeKeywordEditor()
+        if (word.isEmpty()) {
+            // 什么都不打就按确定 = 不改了。不写一句「没输入」——
+            // 屏幕上的值没变，就是最直接的答复
+            back?.requestFocus()
+            return
+        }
+        Settings.setKeyword(this, at, word)
+        paintKeywordValues()
+        paintSettings()
+        // 首页那排按钮是同一份数据的另一处渲染，改完立刻重铺
+        home.refreshKeywords()
+        back?.requestFocus()
+        hint(getString(R.string.kw_saved, at + 1, word), autoHide = true)
+        Diag.confirm("关键词 ${at + 1} → $word")
+    }
+
+    private fun resetKeywords() {
+        Settings.resetKeywords(this)
+        paintKeywordValues()
+        paintSettings()
+        home.refreshKeywords()
+        hint(getString(R.string.kw_reset_done), autoHide = true)
+        Diag.confirm("关键词恢复默认")
+    }
+
     private fun onAccountAction() {
         if (!LoginApi.isLoggedIn()) {
             login.show()
@@ -1203,10 +1731,29 @@ class MainActivity : Activity() {
         LoginApi.logout()
         accountUser = ""
         accountFaceUrl = ""
+        accountVip = ""
         home.invalidate()
         paintAccount()
         hint(getString(R.string.account_logout_done), autoHide = true)
         log("已退出登录（buvid 保留）")
+    }
+
+    /**
+     * 切换账号：先退掉当前这个，再直接弹扫码。
+     *
+     * 不做「多账号列表」：B 站这套 Cookie 是单会话的（一个 buvid + 一个 SESSDATA），
+     * 存两份就要自己管切换时的收藏/历史串号问题，而这个应用只有一个人用。
+     * 换人 = 退出 + 重扫，一步不少，但每一步都是用户看得懂的动作。
+     */
+    private fun switchAccount() {
+        LoginApi.logout()
+        accountUser = ""
+        accountFaceUrl = ""
+        accountVip = ""
+        home.invalidate()
+        paintAccount()
+        log("切换账号：已退出旧账号，等待扫码")
+        login.show()
     }
 
     private fun onLoggedIn(uname: String) {
@@ -1215,9 +1762,15 @@ class MainActivity : Activity() {
         paintAccount()
         refreshAccountName()
         hint(getString(R.string.login_ok, uname.ifEmpty { "已登录" }), autoHide = true)
-        if (accountPanel.visibility == View.VISIBLE) accountPanel.post { accountBtn.requestFocus() }
-        else if (playerOpen) toCover()
-        else home.returnFocus()
+        // 登录浮层是从「我的」那一页按出来的：它还开着，焦点交回那一页，
+        // 别把人甩回首页（设置页还压在下面，看上去像登录完被踢出来了）
+        if (accountPanel.visibility == View.VISIBLE) {
+            accountPanel.post { accountSwitch.requestFocus() }
+        } else if (playerOpen) {
+            toCover()
+        } else {
+            home.returnFocus(HomeStage.Dest.ACCOUNT)
+        }
     }
 
     private fun refreshAccountName() {
@@ -1229,16 +1782,33 @@ class MainActivity : Activity() {
             if (nav.isLogin) {
                 accountUser = nav.uname
                 accountFaceUrl = nav.face
+                accountVip = vipTextOf(nav)
                 paintAccount()
             } else {
                 // Cookie 在但服务端不认（过期/被踢）：按未登录处理，别让用户对着一个假登录态
                 LoginApi.logout()
                 accountUser = ""
                 accountFaceUrl = ""
+                accountVip = ""
                 home.invalidate()
                 paintAccount()
             }
         }
+    }
+
+    /**
+     * 会员身份那一行写什么。
+     *
+     * 优先用 nav 自己给的 label（「年度大会员」「大会员」这类原话）——按 status
+     * 拼词分不出年度和月度，还会在「大会员但已过期」时写错。label 缺失时才退回
+     * status/vipStatus 的粗判断；两者都没有就写「普通用户」，这是真实的信息，
+     * 不是占位符。
+     */
+    private fun vipTextOf(nav: NavData): String {
+        val label = nav.vip?.label?.text.orEmpty().trim()
+        if (label.isNotEmpty()) return label
+        val active = nav.vipStatus == 1 || (nav.vip?.status ?: 0) == 1
+        return getString(if (active) R.string.account_vip_member else R.string.account_vip_normal)
     }
 
     // ------------------------------------------------------------------ 杂项

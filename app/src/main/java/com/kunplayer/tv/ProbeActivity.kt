@@ -170,7 +170,8 @@ class ProbeActivity : Activity() {
                     BiliApi.fetchPlayUrl(testBvid, view.cid, ::logLine)
                 } ?: return@withContext fail("拿不到 DASH，音频方案不成立。")
 
-                val pick = step("⑥ 选音轨") { BiliApi.pickAudio(playUrl, ::logLine) }
+                // 探针固定走「自动」档：它验的是链路通不通，不该受用户音质偏好影响
+                val pick = step("⑥ 选音轨") { BiliApi.pickAudio(playUrl, 0, ::logLine) }
                     ?: return@withContext fail("DASH 里有声无轨。")
 
                 logLine("")

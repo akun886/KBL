@@ -6,6 +6,7 @@ import android.os.Looper
 import android.util.Log
 import com.kunplayer.tv.audio.AudioBus
 import com.kunplayer.tv.cache.Resume
+import com.kunplayer.tv.cache.Settings
 import com.kunplayer.tv.model.AudioPick
 import com.kunplayer.tv.model.Track
 import com.kunplayer.tv.net.BiliApi
@@ -546,7 +547,9 @@ class PlaybackController private constructor(private val context: Context) {
             if (!Wbi.ready()) runCatching { BiliApi.fetchNav { log(it) } }
             val cid = if (track.cid > 0) track.cid else BiliApi.fetchView(track.bvid) { log(it) }.cid
             val data = BiliApi.fetchPlayUrl(track.bvid, cid) { log(it) }
-            Resolved(BiliApi.pickAudio(data) { log(it) }, cid)
+            // 音质每一首都重读一次偏好：设置里改完不必重启，下一首就是新档。
+            // 已经解好的地址仍按 RESOLVE_TTL_MS 复用，不会因为切歌反复重签
+            Resolved(BiliApi.pickAudio(data, Settings.quality(context)) { log(it) }, cid)
         } catch (c: CancellationException) {
             // 取流被取消（用户已经按了下一首），不能吞掉，否则 cancel 失效
             throw c
@@ -554,6 +557,17 @@ class PlaybackController private constructor(private val context: Context) {
             log("取流异常 ${t.javaClass.simpleName}: ${t.message}")
             null
         }
+    }
+
+    /**
+     * 音质档位改过：把已经解好的流地址作废。
+     *
+     * 只丢缓存、不动正在播的这首——切档不该把歌打断。下一首（或再点这一首）
+     * 就会按新档重新走一次 playurl，日志里有「选轨 档位=…」那一条可以对账。
+     */
+    fun invalidateStream() {
+        cache = null
+        log("音质档位已切换，下一次取流生效")
     }
 
     fun release() {

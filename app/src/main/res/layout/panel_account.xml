@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 「我的」页：上半是账号，下半是播放设置。
+<!-- 设置页。0.30.0 从「我的」改名「设置」，并从一页平铺改成二级：
 
-     登录的唯一入口放在这里，不散在收藏页与历史页——否则「登录」会出现三次，
-     而用户在电视上最不想做的事，就是在三个地方分别判断自己是不是已登录。
+     根页只回答「改哪一类」，六行六个去处；每一类自己一页，一页只放同一件事的行。
+     原来四项设置和账号挤在一屏里，账号的头像昵称占了半屏、设置只够放四行，
+     想再加一项就得滚。分页之后每页的行数都是固定的三到五行，
+     光标永远在一屏之内，不用滚也不用数。
 
-     0.29.0 起这一页多了四项播放设置（频谱样式 / 频谱颜色 / 响度均衡 / 返回桌面后继续播放）。
-     它们不另开一页：这一页原本只有「头像 → 昵称 → 按钮」一条直线，空着下半屏；
-     而四项设置各占一行、一行一个开关，正好是电视上最省事的形状——
-     光标上下走，左右改值，不用进二级页面。
+     根页第五项「后台播放」不另开子页：它只有一个开关，进去再按一下等于多两下按键。
+     能在一行里说完的事就在一行里说完，这也是六项里只有它有值没有箭头的原因。
 
-     整块包在 ScrollView 里：540dp 的屏减去页脚版本号，内容刚好卡着，
-     哪天再加第五项就会溢出。能滚的页面比被切掉半行的页面安全。 -->
+     二级页的返回交给遥控器返回键（MainActivity 把焦点交回进来那一行）。
+     页面里不再放「‹ 返回」控件：电视上返回键就是这个意思，多一个按钮只是多一个焦点位。 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/account_panel"
     android:layout_width="match_parent"
@@ -18,14 +18,16 @@
     android:background="@color/bg"
     android:visibility="gone">
 
+    <!-- ============================================================ 根页 -->
     <ScrollView
+        android:id="@+id/set_page_root"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"
         android:focusable="false"
         android:overScrollMode="never"
-        android:paddingTop="26dp"
-        android:paddingBottom="54dp"
+        android:paddingTop="30dp"
+        android:paddingBottom="40dp"
         android:scrollbars="none">
 
         <LinearLayout
@@ -34,8 +36,666 @@
             android:gravity="center_horizontal"
             android:orientation="vertical">
 
-            <!-- 头像。没登录就整块收起来：一个空圆比「未登录」三个字更让人以为
-                 这里该有个图却没加载出来 -->
+            <TextView
+                android:layout_width="420dp"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/settings_root_title"
+                android:textColor="@color/text_primary"
+                android:textSize="24sp" />
+
+            <!-- 每行：左边是什么，右边现在是哪个值，最右一道箭头说明「按下去换一页」。
+                 只看值分不出「开着的开关」和「能进去的页」，箭头补的正是这一句话，
+                 而不必再写一行「按确认进入」。 -->
+            <LinearLayout
+                android:id="@+id/set_row_spectrum"
+                android:layout_width="420dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_row"
+                android:clickable="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/settings_spectrum"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/set_row_spectrum_val"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+
+                <ImageView
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginStart="8dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_chevron"
+                    android:tint="@color/text_muted" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/set_row_lyrics"
+                android:layout_width="420dp"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_row"
+                android:clickable="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/settings_lyrics"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/set_row_lyrics_val"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+
+                <ImageView
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginStart="8dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_chevron"
+                    android:tint="@color/text_muted" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/set_row_quality"
+                android:layout_width="420dp"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_row"
+                android:clickable="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/settings_quality"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/set_row_quality_val"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+
+                <ImageView
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginStart="8dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_chevron"
+                    android:tint="@color/text_muted" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/set_row_keywords"
+                android:layout_width="420dp"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_row"
+                android:clickable="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/settings_keywords"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/set_row_keywords_val"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+
+                <ImageView
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginStart="8dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_chevron"
+                    android:tint="@color/text_muted" />
+            </LinearLayout>
+
+            <!-- 后台播放：唯一一行没有箭头。它本身就是开关，按一下当场翻 -->
+            <LinearLayout
+                android:id="@+id/set_row_bg"
+                android:layout_width="420dp"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_row"
+                android:clickable="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/settings_background"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/set_row_bg_val"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/set_row_mine"
+                android:layout_width="420dp"
+                android:layout_height="44dp"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_row"
+                android:clickable="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/settings_mine"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/set_row_mine_val"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+
+                <ImageView
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_marginStart="8dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_chevron"
+                    android:tint="@color/text_muted" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- ======================================================== 频谱设置 -->
+    <LinearLayout
+        android:id="@+id/set_page_spectrum"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingTop="30dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="420dp"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/settings_spectrum"
+            android:textColor="@color/text_primary"
+            android:textSize="24sp" />
+
+        <LinearLayout
+            android:id="@+id/set_style_row"
+            android:layout_width="420dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_style"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/set_style_val"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/set_color_row"
+            android:layout_width="420dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_color"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+
+            <View
+                android:id="@+id/set_color_dot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_circle_white" />
+
+            <TextView
+                android:id="@+id/set_color_val"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ======================================================== 歌词设置 -->
+    <LinearLayout
+        android:id="@+id/set_page_lyrics"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingTop="30dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="420dp"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/settings_lyrics"
+            android:textColor="@color/text_primary"
+            android:textSize="24sp" />
+
+        <LinearLayout
+            android:id="@+id/set_lyric_on_row"
+            android:layout_width="420dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_lyrics_on"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/set_lyric_on_val"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/set_lyric_color_row"
+            android:layout_width="420dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_lyrics_color"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+
+            <View
+                android:id="@+id/set_lyric_color_dot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_circle_white" />
+
+            <TextView
+                android:id="@+id/set_lyric_color_val"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/set_lyric_font_row"
+            android:layout_width="420dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_lyrics_font"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/set_lyric_font_val"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/set_lyric_size_row"
+            android:layout_width="420dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_lyrics_size"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/set_lyric_size_val"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- 预览。颜色、字体、字号三件事都是「看起来对不对」，只看右边的词
+             （白 / 黑体 / 大）判断不了。这行字按当前设置实时画，
+             改一次就能在同一屏里看到结果，不必退回播放页比对。 -->
+        <TextView
+            android:id="@+id/lyric_preview"
+            android:layout_width="420dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="center"
+            android:text="@string/settings_lyrics_preview"
+            android:textColor="@color/text_primary"
+            android:textSize="22sp" />
+    </LinearLayout>
+
+    <!-- ======================================================== 音质选择 -->
+    <LinearLayout
+        android:id="@+id/set_page_quality"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingTop="30dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="420dp"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:fontFamily="sans-serif-medium"
+            android:text="@string/settings_quality"
+            android:textColor="@color/text_primary"
+            android:textSize="24sp" />
+
+        <!-- 一行五档：确认键换下一档，左右键也能换。和频谱样式同一套手感——
+             这一页没有第二行控件，把「一档一行」摆成五行的确是更直观，
+             但五档里有三档在多数稿件上根本拿不到（接口只给一条音轨），
+             摆五行会让人以为「选了没生效」。一行轮换 + 日志里记实际选中的码率更实在。 -->
+        <LinearLayout
+            android:id="@+id/set_quality_row"
+            android:layout_width="420dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_quality"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/set_quality_val"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- 响度均衡跟着音质放在这一页：两件事都是「出来的声音」，分到两个页面
+             等于让用户为了调音量跑两趟。原来它在根页，0.30.0 根页让位给六类之后
+             并到这儿——功能一个都没少。 -->
+        <LinearLayout
+            android:id="@+id/set_norm_row"
+            android:layout_width="420dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_normalize"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/set_norm_val"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ======================================================== 搜索关键词 -->
+    <ScrollView
+        android:id="@+id/set_page_keywords"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:focusable="false"
+        android:overScrollMode="never"
+        android:paddingTop="30dp"
+        android:paddingBottom="30dp"
+        android:scrollbars="none"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="420dp"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/settings_keywords"
+                android:textColor="@color/text_primary"
+                android:textSize="24sp" />
+
+            <!-- 十行由代码按 Settings.keywords() 铺（行模板复用 set_row.xml），
+                 这里只留容器：槽位数和按钮数是同一个数，写死在两处迟早对不上 -->
+            <LinearLayout
+                android:id="@+id/kw_rows"
+                android:layout_width="420dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <LinearLayout
+                android:id="@+id/kw_reset"
+                android:layout_width="420dp"
+                android:layout_height="40dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_row"
+                android:clickable="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/settings_keywords_reset"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="15sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- ============================================================= 我的 -->
+    <ScrollView
+        android:id="@+id/set_page_mine"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:focusable="false"
+        android:overScrollMode="never"
+        android:paddingTop="30dp"
+        android:paddingBottom="40dp"
+        android:scrollbars="none"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="420dp"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/settings_mine"
+                android:textColor="@color/text_primary"
+                android:textSize="24sp" />
+
             <ImageView
                 android:id="@+id/account_face"
                 android:layout_width="84dp"
@@ -56,6 +716,8 @@
                 android:textColor="@color/text_primary"
                 android:textSize="27sp" />
 
+            <!-- 会员身份。未登录写「未登录」，登录了写大会员 / 年度大会员 / 普通用户。
+                 这一条直接从 nav 的 vip 字段来，切换账号后跟着换 -->
             <TextView
                 android:id="@+id/account_sub"
                 android:layout_width="wrap_content"
@@ -83,7 +745,26 @@
                 android:textColor="#FF000000"
                 android:textSize="18sp" />
 
-            <!-- 异常记录。只在真留有崩溃文件时出现，平时不占位 -->
+            <!-- 切换账号。登录着才出现：未登录时它和上面那颗「扫码登录」是同一件事 -->
+            <TextView
+                android:id="@+id/account_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_pill_dark"
+                android:clickable="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:fontFamily="sans-serif-medium"
+                android:paddingStart="24dp"
+                android:paddingTop="9dp"
+                android:paddingEnd="24dp"
+                android:paddingBottom="9dp"
+                android:text="@string/account_switch"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:visibility="gone" />
+
             <TextView
                 android:id="@+id/account_diag"
                 android:layout_width="wrap_content"
@@ -94,165 +775,86 @@
                 android:visibility="gone" />
 
             <TextView
-                android:layout_width="420dp"
+                android:id="@+id/account_version"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="26dp"
-                android:layout_marginBottom="6dp"
-                android:letterSpacing="0.08"
-                android:text="@string/settings_title"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
-
-            <!-- 四项设置。行不写字也要能看出「可以改」：右边那个值用强调色，
-                 光标落上去整行提亮（bg_row）。 -->
-            <LinearLayout
-                android:id="@+id/set_style_row"
-                android:layout_width="420dp"
-                android:layout_height="40dp"
-                android:background="@drawable/bg_row"
-                android:clickable="true"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/settings_style"
-                    android:textColor="@color/text_primary"
-                    android:textSize="15sp" />
-
-                <TextView
-                    android:id="@+id/set_style_val"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/accent"
-                    android:textSize="14sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/set_color_row"
-                android:layout_width="420dp"
-                android:layout_height="40dp"
-                android:layout_marginTop="4dp"
-                android:background="@drawable/bg_row"
-                android:clickable="true"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/settings_color"
-                    android:textColor="@color/text_primary"
-                    android:textSize="15sp" />
-
-                <View
-                    android:id="@+id/set_color_dot"
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
-                    android:layout_marginEnd="8dp"
-                    android:background="@drawable/bg_circle_white" />
-
-                <TextView
-                    android:id="@+id/set_color_val"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/accent"
-                    android:textSize="14sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/set_norm_row"
-                android:layout_width="420dp"
-                android:layout_height="40dp"
-                android:layout_marginTop="4dp"
-                android:background="@drawable/bg_row"
-                android:clickable="true"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/settings_normalize"
-                    android:textColor="@color/text_primary"
-                    android:textSize="15sp" />
-
-                <TextView
-                    android:id="@+id/set_norm_val"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/accent"
-                    android:textSize="14sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/set_bg_row"
-                android:layout_width="420dp"
-                android:layout_height="40dp"
-                android:layout_marginTop="4dp"
-                android:background="@drawable/bg_row"
-                android:clickable="true"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/settings_background"
-                    android:textColor="@color/text_primary"
-                    android:textSize="15sp" />
-
-                <TextView
-                    android:id="@+id/set_bg_val"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/accent"
-                    android:textSize="14sp" />
-            </LinearLayout>
+                android:textColor="@color/text_muted"
+                android:textSize="13sp" />
         </LinearLayout>
     </ScrollView>
 
-    <!-- 应用名 + 版本号。这是自用 sideload 包，最常问的一句就是「电视上装的是哪一版」，
-         以前只能去系统设置里翻。文本在 paintAccount() 里填，因为版本号读 BuildConfig，
-         写不进 XML。不可聚焦：这一页的焦点全在上面那些行上。 -->
-    <TextView
-        android:id="@+id/account_version"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="18dp"
-        android:textColor="@color/text_secondary"
-        android:textSize="13sp" />
+    <!-- ====================================================== 关键词编辑 -->
+    <!-- 复用搜索页那块九宫格：电视上没有可用的中文输入法，能打的只有 a-z，
+         而 B 站搜索吃拼音原文（`yueyu` 和「粤语」返回同一批结果）。
+         为了一件「偶尔改一次」的事重做一套输入法不值。 -->
+    <FrameLayout
+        android:id="@+id/kw_scrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#B8000000"
+        android:clickable="true"
+        android:focusable="false"
+        android:visibility="gone">
 
-    <!-- 色板。盖在这一页上面，不是另开一页：颜色是从「频谱颜色」那一行点开的，
-         跳到另一页去选，回来还得再认一遍自己选的是哪个频谱。
+        <LinearLayout
+            android:id="@+id/kw_card"
+            android:layout_width="400dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_picker"
+            android:clickable="true"
+            android:focusable="false"
+            android:orientation="vertical"
+            android:paddingStart="18dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="18dp"
+            android:paddingBottom="16dp">
 
-         一屏十格、一次看完：颜色是「看」出来的，不是「数」出来的——
-         原来左右键一个个轮，选最后一个要按八下，还得记住刚才停在哪。
+            <TextView
+                android:id="@+id/kw_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:textSize="17sp"
+                android:textColor="@color/text_primary" />
 
-         没有「确定」：按下哪一格就已经生效了，再要一次确认只是让人多点一下。
-         选错也只要再点一次，代价一样。 -->
+            <TextView
+                android:id="@+id/kw_echo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingBottom="6dp"
+                android:textColor="@color/text_primary"
+                android:textSize="19sp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/hairline" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp">
+
+                <LinearLayout
+                    android:id="@+id/kw_keypad"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </FrameLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- ============================================================ 色板 -->
+    <!-- 盖在设置页上面，不是另开一页：颜色是从「频谱颜色 / 歌词颜色」那一行点开的，
+         跳到另一页去选，回来还得再认一遍自己选的是哪个。
+
+         一个实例服务两处：打开时告诉它改的是频谱还是歌词（ColorPalette.showFor），
+         所以两处调色是同一套格子、同一套手感，不会一处十格一处六格。 -->
     <FrameLayout
         android:id="@+id/palette_scrim"
         android:layout_width="match_parent"

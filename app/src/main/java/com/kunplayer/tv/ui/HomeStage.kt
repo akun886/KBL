@@ -4,6 +4,7 @@ import android.app.Activity
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.graphics.drawable.Drawable
+import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -26,6 +27,7 @@ import com.kunplayer.tv.net.HistoryApi
 import com.kunplayer.tv.net.LoginApi
 import com.kunplayer.tv.net.LyricsApi
 import com.kunplayer.tv.net.RecommendApi
+import com.kunplayer.tv.net.SearchApi
 import com.kunplayer.tv.player.PlaybackController
 import com.kunplayer.tv.player.QueueMode
 import kotlinx.coroutines.CoroutineScope
@@ -106,7 +108,7 @@ class HomeStage(
          * 13sp 灰字，整页就从界面变成说明书。留下来的两条是真约束——推荐池怎么捞
          * （随机关键词 · 一小时以上）、推荐 UP 按什么排——这两个从界面上看不出来。
          */
-        REC_MUSIC(R.string.nav_rec_music, R.string.home_title_rec_music, R.string.home_sub_rec_music, R.drawable.ic_nav_rec),
+        REC_MUSIC(R.string.nav_rec_music, R.string.home_title_rec_music, 0, R.drawable.ic_nav_rec),
         MUSIC(R.string.nav_music, R.string.home_title_music, 0, R.drawable.ic_nav_music),
         REC_UP(R.string.nav_rec_up, R.string.home_title_rec_up, R.string.home_sub_rec_up, R.drawable.ic_nav_up, hidden = true),
         QUEUE(R.string.nav_queue, R.string.home_title_queue, 0, R.drawable.ic_nav_queue),
@@ -115,7 +117,17 @@ class HomeStage(
         FAV(R.string.nav_fav, R.string.home_title_fav, 0, R.drawable.ic_nav_fav),
         FOLLOW(R.string.nav_follow, 0, 0, R.drawable.ic_nav_follow, action = true),
         HIST(R.string.nav_hist, R.string.home_title_hist, 0, R.drawable.ic_nav_hist),
-        SEARCH(R.string.nav_search, 0, 0, R.drawable.ic_nav_search, action = true),
+        /**
+         * 搜索在 0.30.0 从侧栏挪到了左上角 LOGO 后面。
+         *
+         * 它是「动作」不是「去处」：从来不成为 dest，点一下开浮层。摆在十条目的地
+         * 中间，每天都要在一列「去哪儿听」里找一行「干一件事」，两件事混在一列里。
+         * 挪到品牌位后面之后，侧栏只剩目的地，搜索成了随时够得着的常驻按钮。
+         *
+         * hidden 留位：action 分支与 fetch 的 when 还在按它穷尽，删掉这一项
+         * 就得在四处同步改。这一行改回 false 它就回到侧栏。
+         */
+        SEARCH(R.string.nav_search, 0, 0, R.drawable.ic_nav_search, action = true, hidden = true),
         ACCOUNT(R.string.nav_account, 0, 0, R.drawable.ic_nav_account, action = true),
     }
 
@@ -131,6 +143,20 @@ class HomeStage(
     private val refresh: ImageView = activity.findViewById(R.id.home_refresh)
     private val count: TextView = activity.findViewById(R.id.home_count)
     private val note: TextView = activity.findViewById(R.id.home_note)
+
+    /** 品牌位后面那颗搜索钮。侧栏不再有「搜索」这一项，入口只剩这里 */
+    private val searchBtn: ImageView = activity.findViewById(R.id.home_search)
+
+    /** 十个快速筛选词。内容与设置里的「搜索关键词」同一份真源 */
+    private val chipBox: LinearLayout = activity.findViewById(R.id.home_chips)
+
+    private val chipViews = ArrayList<TextView>()
+
+    /** 当前筛的是第几个词。-1 = 没筛，这一页是随机长合集 */
+    private var chipAt = -1
+
+    /** 正在跑的那一次关键词搜索。连按两颗按钮只留最后一颗的结果 */
+    private var chipJob: Job? = null
 
     private val bar: View = activity.findViewById(R.id.home_bar)
     private val barCoverBox: View = activity.findViewById(R.id.home_bar_cover_box)
@@ -267,8 +293,17 @@ class HomeStage(
      */
     private var barPane: BarPane? = null
 
-    private fun effectiveBarPane(): BarPane =
-        barPane ?: if (barLines.isNotEmpty()) BarPane.LYRIC else BarPane.SPECTRUM
+    private fun effectiveBarPane(): BarPane {
+        val lyricsAllowed = Settings.lyricsOn(activity)
+        val chosen = barPane
+            ?: if (lyricsAllowed && barLines.isNotEmpty()) BarPane.LYRIC else BarPane.SPECTRUM
+        // 设置里关掉了歌词：显式选着「歌词」这一档也不能把一屏空白端出来
+        return if (chosen == BarPane.LYRIC && (!lyricsAllowed || barLines.isEmpty())) {
+            BarPane.SPECTRUM
+        } else {
+            chosen
+        }
+    }
 
     /** 文字块（歌名行 + 间距 + 歌手行）的实际总高（px），常态下量一次 */
     private var barTextH = 0
@@ -277,6 +312,7 @@ class HomeStage(
 
     init {
         buildNav()
+        buildChips()
         barPane = when (Settings.barPane(activity)) {
             0 -> BarPane.LYRIC
             1 -> BarPane.SPECTRUM
@@ -287,6 +323,14 @@ class HomeStage(
         listView.layoutManager = ScrollableLayoutManager(activity)
         listView.adapter = adapter
         listView.itemAnimator = null
+
+        searchBtn.setOnClickListener {
+            Diag.confirm("首页-搜索")
+            onSearch()
+        }
+        searchBtn.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) Diag.enter("搜索按钮")
+        }
 
         playAll.setOnClickListener { playAll() }
         playAll.setOnFocusChangeListener { _, hasFocus ->
@@ -348,6 +392,7 @@ class HomeStage(
         // 跑马灯只在 selected 状态下滚。TextView 默认不可聚焦时不会自己选中，
         // 于是歌词会静静停在那里、超长部分直接被裁掉——「滚动显示」就没了
         barLyric.isSelected = true
+        paintLyricStyle()
 
         // 切换格：确认轮换，左右也轮换。三档下它都常驻，不进底栏那排横向键的链子，
         // 从歌名按下来才进得去、按上回歌名——老路径一格都不多走
@@ -379,7 +424,7 @@ class HomeStage(
             // 分组标题：不聚焦，只做视觉分段。汽水把「我的音乐」和「更多」
             // 分成两段，八项平铺成一条会读不出层次
             if (d == Dest.FAV) section(R.string.nav_group_mine)
-            if (d == Dest.SEARCH) section(R.string.nav_group_more)
+            if (d == Dest.ACCOUNT) section(R.string.nav_group_more)
 
             val item = LayoutInflater.from(activity)
                 .inflate(R.layout.item_nav, navBox, false) as TextView
@@ -466,6 +511,117 @@ class HomeStage(
         }
     }
 
+    // ------------------------------------------------------------ 快速筛选词
+
+    /**
+     * 十个筛选按钮。
+     *
+     * 它们替代的是原来那行「随机关键词 · 一小时以上」——那句话在解释「这一页是怎么来的」，
+     * 而这一页真正缺的是「我只想听粤语」这个动作。同样占一行高度，一行字换成十个入口。
+     *
+     * 词本身不写死在代码里：设置页「搜索关键词」改完，这里按同一份
+     * [Settings.keywords] 重铺，界面上看到的就是真正会发出去的那十个词。
+     */
+    private fun buildChips() {
+        chipBox.removeAllViews()
+        chipViews.clear()
+        for (word in Settings.keywords(activity)) {
+            val chip = TextView(activity)
+            chip.text = word
+            chip.setTextColor(activity.getColor(R.color.text_secondary))
+            chip.textSize = 12f
+            chip.gravity = android.view.Gravity.CENTER
+            chip.background = activity.getDrawable(R.drawable.bg_chip)
+            chip.isClickable = true
+            chip.isFocusable = true
+            chip.isFocusableInTouchMode = true
+            chip.setPadding(dp(9), 0, dp(9), 0)
+            val lp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(26),
+            ).apply { marginEnd = dp(6) }
+            chip.setOnClickListener { quickSearch(chipViews.indexOf(chip)) }
+            chip.setOnFocusChangeListener { v, hasFocus ->
+                if (hasFocus) Diag.enter("筛选词-${(v as TextView).text}")
+                paintChip(v as TextView, hasFocus)
+            }
+            chipBox.addView(chip, lp)
+            chipViews += chip
+        }
+    }
+
+    private fun paintChip(v: TextView, hasFocus: Boolean) {
+        val at = chipViews.indexOf(v)
+        val picked = at >= 0 && at == chipAt
+        v.setTextColor(
+            when {
+                hasFocus -> 0xFF000000.toInt()
+                picked -> activity.getColor(R.color.accent)
+                else -> activity.getColor(R.color.text_secondary)
+            }
+        )
+        v.background = activity.getDrawable(if (hasFocus) R.drawable.bg_chip_focus else R.drawable.bg_chip)
+    }
+
+    private fun paintChips() {
+        for (v in chipViews) paintChip(v, v.isFocused)
+    }
+
+    /**
+     * 设置里改过关键词：整排重铺。
+     *
+     * 页面内容不动——改的是按钮上的字，正在看的那一屏没有理由跟着刷新。
+     * 但如果当前正筛着某个词、而这个词刚好被改了，高亮就作废（见下面的夹取），
+     * 否则屏幕上会标着一个已经不存在的词。
+     */
+    fun refreshKeywords() {
+        buildChips()
+        if (chipAt >= chipViews.size) chipAt = -1
+        paintChips()
+    }
+
+    /**
+     * 按一个词立刻搜一屏。
+     *
+     * 走的是普通搜索（不是「一小时以上」那条长合集搜索）：筛选词里有「无损」「Hi-Res」
+     * 这种指向短音频的词，硬套一小时闸门会搜出空页。搜到什么就听什么，这一页的
+     * 标题仍然只写「推荐音乐」——按钮自己已经在说「现在筛的是哪个词」。
+     */
+    private fun quickSearch(at: Int) {
+        val word = chipViews.getOrNull(at)?.text?.toString().orEmpty()
+        if (word.isEmpty()) return
+        val again = at == chipAt
+        chipAt = at
+        paintChips()
+        // 上一次长合集还在跑就停掉：它回来会把这一屏换成随机那批
+        recJob?.cancel()
+        recJob = null
+        spinRefresh(false)
+        // 标题跟着换成这个词：底下已经是「国语」的结果了，标题还写「推荐音乐」
+        // 就是在说假话——这一屏此刻不是推荐，是这个词的搜索
+        title.setText(word)
+        note.text = activity.getString(R.string.home_loading)
+        chipJob?.cancel()
+        Diag.confirm("快速搜索「$word」${if (again) "重搜" else ""}")
+        chipJob = scope.launch {
+            val got = withContext(Dispatchers.IO) {
+                runCatching { SearchApi.search(word, log = log) }
+                    .onFailure { log("快速搜索失败 ${it.javaClass.simpleName}: ${it.message}") }
+                    .getOrNull()
+            }
+            // 这期间已经切走、或者又点了别的词：这份结果不该上屏
+            if (dest != Dest.REC_MUSIC || chipAt != at) return@launch
+            if (got == null) {
+                paintNote(R.string.home_empty)
+                return@launch
+            }
+            render(got)
+            if (got.isEmpty()) paintNote(R.string.home_empty)
+        }
+    }
+
+    private fun dp(v: Int): Int = (v * activity.resources.displayMetrics.density + 0.5f).toInt()
+
     // ------------------------------------------------------------ 取数
 
     /** 进入某个目的地。focusList 为 true 时把焦点交给列表第一行（选中正在播的那首） */
@@ -487,6 +643,16 @@ class HomeStage(
         // 「换一批」只在推荐音乐里出现。它按下去换的是这一页的内容，
         // 别的页没有可换的东西——留着就是一颗按不动的按钮
         refresh.visibility = if (d == Dest.REC_MUSIC) View.VISIBLE else View.GONE
+        // 筛选词同理：它们是这一页的取数方式，别的页没有可筛的东西
+        chipBox.visibility = if (d == Dest.REC_MUSIC) View.VISIBLE else View.GONE
+        if (d == Dest.REC_MUSIC) {
+            // 重新进这一页 = 回到「随机那一批」。筛选是当场那一次的动作，
+            // 不是这个页面的长期状态：留着高亮会让人以为明天开机还是只放粤语
+            chipAt = -1
+            chipJob?.cancel()
+            chipJob = null
+            paintChips()
+        }
         // 走到别的页就停手：转圈的动画和还在路上的那一次搜索都不该跟着走。
         // 不停的话，图标在看不见的地方一直转，动画对象也一直留着
         if (d != Dest.REC_MUSIC) {
@@ -610,6 +776,13 @@ class HomeStage(
         // 上一轮还在跑就取消：连按几下不该同时打三路 × 好几轮，
         // 回来的顺序还会乱（后发的先到，屏幕上就是两批混着）
         recJob?.cancel()
+        // 「换一批」是「不要筛了，重抽」：筛词高亮跟着落下，否则屏幕上还标着粤语，
+        // 底下已经是随机那批，人会以为筛选坏了
+        chipAt = -1
+        chipJob?.cancel()
+        paintChips()
+        // 筛词退场，标题也退回本来的名字（见 quickSearch 里为什么改它）
+        title.setText(Dest.REC_MUSIC.title)
         note.text = activity.getString(R.string.home_loading)
         spinRefresh(true)
         if (focusRefresh) refresh.requestFocus()
@@ -1100,8 +1273,8 @@ class HomeStage(
         }
         val cur = effectiveBarPane()
         val next = when {
-            barLines.isEmpty() ->
-                // 没词：只能在两档频谱之间来回，别翻进一屏空白
+            !Settings.lyricsOn(activity) || barLines.isEmpty() ->
+                // 没词（或设置里关掉了歌词）：只能在两档频谱之间来回，别翻进一屏空白
                 if (cur == BarPane.SPECTRUM) BarPane.IMMERSIVE else BarPane.SPECTRUM
             cur == BarPane.LYRIC -> BarPane.SPECTRUM
             cur == BarPane.SPECTRUM -> BarPane.IMMERSIVE
@@ -1154,6 +1327,26 @@ class HomeStage(
         barSpectrum.applySettings()
         barBigSpectrum.applySettings()
         adapter.notifyDataSetChanged()
+    }
+
+    /**
+     * 设置里改过歌词的颜色 / 字体 / 大小：底栏那一行跟着换。
+     *
+     * 字体这里只认字重，不换字族：底栏那一行只有 16dp 高、还带着跑马灯，
+     * 宋体的字面比黑体高一截，换过去会顶到上面的歌名。播放页那一屏才换字族。
+     */
+    private fun paintLyricStyle() {
+        barLyric.setTextColor(Settings.lyricsColor(activity))
+        barLyric.setTextSize(
+            TypedValue.COMPLEX_UNIT_SP,
+            12f * Settings.lyricsScale(activity).coerceIn(0.85f, 1.15f),
+        )
+    }
+
+    /** 歌词设置改完：重取外观，并按新的开关决定这一格该显示歌词还是频谱 */
+    fun refreshLyrics() {
+        paintLyricStyle()
+        paintBarPane(playback.snapshot().positionMs)
     }
 
     fun paintBar() {
@@ -1411,11 +1604,19 @@ class HomeStage(
         KeyEvent.KEYCODE_DPAD_DOWN -> {
             val lastNav = lastNavView()
             when {
+                // 品牌位那颗搜索钮 ↓：回到侧栏当前这一项。它上面没有别的东西，
+                // 不接这一下 FocusFinder 会按几何位置挑，挑中的是屏幕另一头
+                activity.currentFocus === searchBtn -> {
+                    focusNav()
+                    true
+                }
                 // 常态：歌名 ↓ 进切换格。沉浸档歌名是 GONE，改由封面 ↓ 进——
                 // 两档下都是「↓ 进切换格」，一格都不多走
                 activity.currentFocus === barTitle -> barPaneBox.requestFocus()
                 activity.currentFocus === barCoverBox &&
                     effectiveBarPane() == BarPane.IMMERSIVE -> barPaneBox.requestFocus()
+                // 筛选词 ↓：落到「播放全部」那一排。下面就是那一排按钮，不越过它们进列表
+                inChips(activity.currentFocus) -> playAll.requestFocus()
                 // 「换一批」往下：直接进列表。它只出现在推荐音乐，那一页没有工具条
                 activity.currentFocus === refresh -> focusFirstRow()
                 // 「播放全部」往下：收藏页先过一下新建/删除，其它单直接进列表
@@ -1462,6 +1663,17 @@ class HomeStage(
                 // 从侧栏下来的人回侧栏——两拨人不该被塞进同一个落点
                 inBar() -> leaveBar()
                 inFavTools(activity.currentFocus) -> playAll.requestFocus()
+                // 筛选词往上：回到侧栏。它们和「播放全部」同属这一页的工具行
+                inChips(activity.currentFocus) -> {
+                    focusNav()
+                    true
+                }
+                // 侧栏第一项往上：离开侧栏，落到品牌位后面那颗搜索钮。
+                // 侧栏上面没有别的东西，不接这一下按键会卡在原地
+                activity.currentFocus === firstNavView() && searchBtn.isShown -> {
+                    searchBtn.requestFocus()
+                    true
+                }
                 // 「播放全部」再往上才是侧栏。这一格跳过去就直接换目的地了
                 activity.currentFocus === playAll || activity.currentFocus === refresh -> {
                     focusNav()
@@ -1515,6 +1727,9 @@ class HomeStage(
 
     /** 「播放全部」和收藏夹工具条上的两个按钮不在列表里，得单独接 */
     private fun inFavTools(v: View?): Boolean = v === favNew || v === favDel
+
+    /** 焦点在不在那排筛选词上。它们是这一页的工具行，不归列表也不归侧栏 */
+    private fun inChips(v: View?): Boolean = v != null && chipViews.any { it === v }
 
     /** 回到列表第一行。播放全部、收藏夹工具条往下都落在这一行 */
     private fun focusFirstRow(): Boolean {
@@ -1590,6 +1805,19 @@ class HomeStage(
 
     /** 侧栏最后一项。它下面就是底栏，这一格是「侧栏→底栏」的入口 */
     private fun lastNavView(): View? = navViews.values.lastOrNull()
+
+    /** 侧栏第一项。它上面是品牌位那颗搜索钮 */
+    private fun firstNavView(): View? = navViews.values.firstOrNull()
+
+    /**
+     * 焦点落到品牌位那颗搜索钮。
+     *
+     * 搜索页退出时用它。以前搜索是侧栏里的一项，退出来交回 navViews[SEARCH] 就行；
+     * 现在它不在侧栏里了，还按老办法找会落空——焦点悬空之后遥控器就「失灵」了。
+     */
+    fun focusSearch() {
+        searchBtn.post { searchBtn.requestFocus() }
+    }
 
     /**
      * 这个下键是不是「按住」。

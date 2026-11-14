@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 设置页里的一行长什么样。三处共用：关键词的十行、以后新加的任何一行。
+
+     为什么不把行直接写进 panel_account.xml：十行关键词除了名字完全一样，
+     复制十遍的下场是改一处漏九处（间距、内边距、字号各飘一档）。
+     这一份是唯一的形状，代码只负责往里填字。
+
+     右边的箭头是「按下去有下一页」的意思，和根页那六行同一套说法；
+     不要「编辑」两个字——整行都是焦点位，字写出来只是把动作复述一遍。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="36dp"
+    android:background="@drawable/bg_row"
+    android:clickable="true"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp">
+
+    <TextView
+        android:id="@+id/set_row_label"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/text_primary"
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/set_row_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/text_secondary"
+        android:textSize="14sp" />
+
+    <ImageView
+        android:layout_width="12dp"
+        android:layout_height="12dp"
+        android:layout_marginStart="8dp"
+        android:contentDescription="@null"
+        android:src="@drawable/ic_chevron"
+        android:tint="@color/text_muted" />
+</LinearLayout>

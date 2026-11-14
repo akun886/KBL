@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 筛选词胶囊的焦点态：整颗翻白、字转黑。
+     和「播放全部」「换一批」同一套说法——聚焦就是这块地方亮了，
+     十个词里只有一颗亮着，位置一眼看得出。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FFFFFFFF" />
+    <corners android:radius="13dp" />
+</shape>

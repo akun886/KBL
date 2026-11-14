@@ -3,6 +3,7 @@ package com.kunplayer.tv.ui
 import android.content.Context
 import android.graphics.Typeface
 import android.util.AttributeSet
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,6 +11,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.kunplayer.tv.R
+import com.kunplayer.tv.cache.Settings
 import com.kunplayer.tv.net.LyricsApi
 import kotlin.math.abs
 
@@ -46,6 +48,14 @@ class LyricsView @JvmOverloads constructor(
     private var lines: List<LyricsApi.Line> = emptyList()
     private var index = -1
 
+    /** 基准字号。设置里的「歌词大小」是在这个数上乘倍数，不是换一个新的绝对值 */
+    private var baseSp = 22f
+
+    /** 当前字号倍数、颜色、字体。每次 applySettings 从偏好里重读 */
+    private var sizeScale = 1f
+    private var textColor = 0xFFFFFFFF.toInt()
+    private var fontMode = Settings.LYRIC_FONT_DEFAULT
+
     val isEmpty: Boolean get() = lines.isEmpty()
 
     init {
@@ -55,6 +65,28 @@ class LyricsView @JvmOverloads constructor(
         isFocusable = false
         clipToPadding = false
         overScrollMode = OVER_SCROLL_NEVER
+        applySettings()
+    }
+
+    /**
+     * 设置里改过歌词的颜色 / 字体 / 大小：重取一遍，并把行的上下留白重新算一次。
+     *
+     * 留白必须跟着字号走：22sp 的行高和 32sp 的行高差一半，留白仍按旧值算的话，
+     * 首句就落不到屏幕中线，「唱到哪儿」靠眼睛判断的那点信息会歪一截。
+     */
+    fun applySettings() {
+        sizeScale = Settings.lyricsScale(context)
+        textColor = Settings.lyricsColor(context)
+        fontMode = Settings.lyricsFont(context)
+        inner.notifyDataSetChanged()
+        applyPadding(height)
+    }
+
+    private fun face(active: Boolean): Typeface? = when (fontMode) {
+        Settings.LYRIC_FONT_HEI ->
+            Typeface.create(if (active) "sans-serif-medium" else "sans-serif", Typeface.NORMAL)
+        Settings.LYRIC_FONT_SONG -> Typeface.create("serif", Typeface.NORMAL)
+        else -> if (active) Typeface.create("sans-serif-medium", Typeface.NORMAL) else null
     }
 
     fun submit(next: List<LyricsApi.Line>) {
@@ -98,12 +130,17 @@ class LyricsView @JvmOverloads constructor(
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         // 半屏留白：首行和末行才能落在中线
-        val row = (ROW_H_DP * resources.displayMetrics.density).toInt()
-        val pad = ((h - row) / 2).coerceAtLeast(0)
-        setPadding(paddingLeft, pad, paddingRight, pad)
+        applyPadding(h)
         if (index >= 0) {
             (layoutManager as? LinearLayoutManager)?.scrollToPositionWithOffset(index, 0)
         }
+    }
+
+    private fun applyPadding(h: Int) {
+        if (h <= 0) return
+        val row = (ROW_H_DP * sizeScale * resources.displayMetrics.density).toInt()
+        val pad = ((h - row) / 2).coerceAtLeast(0)
+        setPadding(paddingLeft, pad, paddingRight, pad)
     }
 
     /** 从后往前找最后一个不晚于当前播放位置的行；都比它晚就停在第一行 */
@@ -121,16 +158,17 @@ class LyricsView @JvmOverloads constructor(
 
             fun bind(line: LyricsApi.Line, active: Boolean, distance: Int) {
                 text.text = line.text
-                text.setTextColor(
-                    context.getColor(if (active) R.color.text_primary else R.color.text_secondary)
-                )
+                // 字号由设置决定：基准 22sp × 倍数。用 setTextSize 而不是 scale，
+                // 这样「把字调大」是真的把字调大，行高和居中都跟着走
+                text.setTextSize(TypedValue.COMPLEX_UNIT_SP, baseSp * sizeScale)
+                // 颜色只有一处真源（设置里的歌词颜色）。当前行与其它行的差别交给
+                // 透明度和字重——两套颜色会在换色时把「当前行」也一起换掉，反而看不出是哪句
+                text.setTextColor(textColor)
                 // 越远越淡。原来一律压到 0.55：隔一行和隔八行一样亮，整屏字幕没有落点。
                 // 分级之后屏幕边缘那几行几乎看不见，也就不必再叠一层渐隐——
                 // 遮罩压在高斯模糊的背景上会露出一条直边，反而更像渲染错误
                 text.alpha = if (index < 0) FALLBACK_ALPHA else alphaAt(distance)
-                text.setTypeface(
-                    if (active) Typeface.create("sans-serif-medium", Typeface.NORMAL) else null
-                )
+                text.setTypeface(face(active))
                 // 当前行放大一号。用 scale 而不是改 textSize：textSize 会改测量高度，
                 // 居中的那一行自己把行高撑大，滚动位置就跟着抖；
                 // scale 只在绘制层放大，布局一个像素都不动
