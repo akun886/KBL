@@ -218,6 +218,9 @@
     <string name="kw_editor_hint">输入拼音</string>
     <string name="kw_saved">关键词 %1$d：%2$s</string>
     <string name="kw_save">保存</string>
+    <string name="kw_ime_hint">输入关键词</string>
+    <string name="kw_use_ime">用电视输入法</string>
+    <string name="kw_use_keypad">用九宫格</string>
     <string name="kw_reset_done">关键词已恢复默认</string>
     <string name="color_cyan">青</string>
     <string name="color_violet">紫</string>

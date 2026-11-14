@@ -8,6 +8,7 @@ import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.LinearInterpolator
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -147,10 +148,13 @@ class HomeStage(
     /** 品牌位后面那颗搜索钮。侧栏不再有「搜索」这一项，入口只剩这里 */
     private val searchBtn: ImageView = activity.findViewById(R.id.home_search)
 
-    /** 十个快速筛选词。内容与设置里的「搜索关键词」同一份真源 */
-    private val chipBox: LinearLayout = activity.findViewById(R.id.home_chips)
+    /** 十五个快速筛选词。内容与设置里的「搜索关键词」同一份真源 */
+    private val chipBox: ChipFlow = activity.findViewById(R.id.home_chips)
 
     private val chipViews = ArrayList<TextView>()
+
+    /** 上一次停在的那个筛选词。「播放全部」按上时回到它，而不是横穿到侧栏去 */
+    private var chipFocus: View? = null
 
     /** 当前筛的是第几个词。-1 = 没筛，这一页是随机长合集 */
     private var chipAt = -1
@@ -514,17 +518,23 @@ class HomeStage(
     // ------------------------------------------------------------ 快速筛选词
 
     /**
-     * 十个筛选按钮。
+     * 十五个筛选按钮。
      *
      * 它们替代的是原来那行「随机关键词 · 一小时以上」——那句话在解释「这一页是怎么来的」，
-     * 而这一页真正缺的是「我只想听粤语」这个动作。同样占一行高度，一行字换成十个入口。
+     * 而这一页真正缺的是「我只想听粤语」这个动作。同样占一行高度，一行字换成十五个入口。
      *
      * 词本身不写死在代码里：设置页「搜索关键词」改完，这里按同一份
-     * [Settings.keywords] 重铺，界面上看到的就是真正会发出去的那十个词。
+     * [Settings.keywords] 重铺，界面上看到的就是真正会发出去的那十五个词。
+     *
+     * 容器是 ChipFlow：一行放不下自己换行，间距也由它给（这里不再设 marginEnd，
+     * 两边各写一份间距就会变成「左边 6dp、右边 12dp」这种错位）。
      */
     private fun buildChips() {
         chipBox.removeAllViews()
         chipViews.clear()
+        // 重铺之后旧的那批 view 已经不在树上了，留着它会让「播放全部 ↑」
+        // 去 requestFocus 一个看不见的控件——焦点当场消失
+        chipFocus = null
         for (word in Settings.keywords(activity)) {
             val chip = TextView(activity)
             chip.text = word
@@ -536,13 +546,16 @@ class HomeStage(
             chip.isFocusable = true
             chip.isFocusableInTouchMode = true
             chip.setPadding(dp(9), 0, dp(9), 0)
-            val lp = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+            val lp = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
                 dp(26),
-            ).apply { marginEnd = dp(6) }
+            )
             chip.setOnClickListener { quickSearch(chipViews.indexOf(chip)) }
             chip.setOnFocusChangeListener { v, hasFocus ->
-                if (hasFocus) Diag.enter("筛选词-${(v as TextView).text}")
+                if (hasFocus) {
+                    chipFocus = v
+                    Diag.enter("筛选词-${(v as TextView).text}")
+                }
                 paintChip(v as TextView, hasFocus)
             }
             chipBox.addView(chip, lp)
@@ -583,9 +596,12 @@ class HomeStage(
     /**
      * 按一个词立刻搜一屏。
      *
-     * 走的是普通搜索（不是「一小时以上」那条长合集搜索）：筛选词里有「无损」「Hi-Res」
-     * 这种指向短音频的词，硬套一小时闸门会搜出空页。搜到什么就听什么，这一页的
-     * 标题仍然只写「推荐音乐」——按钮自己已经在说「现在筛的是哪个词」。
+     * 口径和「推荐音乐」本身**完全一致**：音乐分区 + 服务端 `duration=4` +
+     * 本地严格大于 60 分钟（[SearchApi.searchLong]）。这一页从头到尾只做一件事——
+     * 长合集，筛词只是换一个挑法；换成普通搜索会把演唱会切回三分钟的翻唱片段，
+     * 那一屏就不再是同一类东西了。宁可某个词搜出来是空的，也不混进短音频。
+     *
+     * 标题跟着换成这个词：「底下已经是这个词的结果，标题还写推荐音乐」是说假话。
      */
     private fun quickSearch(at: Int) {
         val word = chipViews.getOrNull(at)?.text?.toString().orEmpty()
@@ -605,7 +621,7 @@ class HomeStage(
         Diag.confirm("快速搜索「$word」${if (again) "重搜" else ""}")
         chipJob = scope.launch {
             val got = withContext(Dispatchers.IO) {
-                runCatching { SearchApi.search(word, log = log) }
+                runCatching { SearchApi.searchLong(word, log = log) }
                     .onFailure { log("快速搜索失败 ${it.javaClass.simpleName}: ${it.message}") }
                     .getOrNull()
             }
@@ -1599,6 +1615,7 @@ class HomeStage(
                     true
                 }
                 inList() -> moveWithinRow(code)
+                inChips(activity.currentFocus) -> moveChip(code)
                 else -> false
             }
         }
@@ -1620,8 +1637,15 @@ class HomeStage(
                 activity.currentFocus === barTitle -> barPaneBox.requestFocus()
                 activity.currentFocus === barCoverBox &&
                     effectiveBarPane() == BarPane.IMMERSIVE -> barPaneBox.requestFocus()
-                // 筛选词 ↓：落到「播放全部」那一排。下面就是那一排按钮，不越过它们进列表
-                inChips(activity.currentFocus) -> playAll.requestFocus()
+                // 筛选词 ↓：先在同流里下移一行（15 个词要换行），到底了才落到
+                // 「播放全部」那一排。下面就是那一排按钮，不越过它们进列表
+                inChips(activity.currentFocus) ->
+                    if (moveChip(code)) {
+                        true
+                    } else {
+                        playAll.requestFocus()
+                        true
+                    }
                 // 「换一批」往下：直接进列表。它只出现在推荐音乐，那一页没有工具条
                 activity.currentFocus === refresh -> focusFirstRow()
                 // 「播放全部」往下：收藏页先过一下新建/删除，其它单直接进列表
@@ -1668,20 +1692,31 @@ class HomeStage(
                 // 从侧栏下来的人回侧栏——两拨人不该被塞进同一个落点
                 inBar() -> leaveBar()
                 inFavTools(activity.currentFocus) -> playAll.requestFocus()
-                // 筛选词往上：回到侧栏。它们和「播放全部」同属这一页的工具行
-                inChips(activity.currentFocus) -> {
-                    focusNav()
-                    true
-                }
+                // 筛选词往上：先在同流里上移一行，已经在第一行才回侧栏。
+                // 15 个词分两行，「往上」大多时候意思是「回上一行」
+                inChips(activity.currentFocus) ->
+                    if (moveChip(code)) {
+                        true
+                    } else {
+                        focusNav()
+                        true
+                    }
                 // 侧栏第一项往上：离开侧栏，落到品牌位后面那颗搜索钮。
                 // 侧栏上面没有别的东西，不接这一下按键会卡在原地
                 activity.currentFocus === firstNavView() && searchBtn.isShown -> {
                     searchBtn.requestFocus()
                     true
                 }
-                // 「播放全部」再往上才是侧栏。这一格跳过去就直接换目的地了
+                // 「播放全部」往上：这一页上面紧挨着的是筛选词，先回那里；
+                // 回到「刚才离开的那一颗」而不是横穿到侧栏——那一下就换目的地了。
+                // 别的页没有筛选词，仍按原路回侧栏
                 activity.currentFocus === playAll || activity.currentFocus === refresh -> {
-                    focusNav()
+                    val back = chipFocus
+                    if (dest == Dest.REC_MUSIC && chipBox.visibility == View.VISIBLE && back != null) {
+                        back.requestFocus()
+                    } else {
+                        focusNav()
+                    }
                     true
                 }
                 inList() -> moveVertical(-1)
@@ -1735,6 +1770,28 @@ class HomeStage(
 
     /** 焦点在不在那排筛选词上。它们是这一页的工具行，不归列表也不归侧栏 */
     private fun inChips(v: View?): Boolean = v != null && chipViews.any { it === v }
+
+    /**
+     * 筛选词在流里横着或竖着走一格。
+     *
+     * 「行尾 → 下一行行首」「上一行哪一颗离得最近」由 [ChipFlow] 按行列算，
+     * 不交给 FocusFinder：它只看几何，两行之间的斜向移动会跳到不相干的地方。
+     *
+     * @return false 表示已经走到流的边界，往哪儿去由调用方决定（上面是侧栏，
+     *         下面是「播放全部」）；横着走到边界就停在原地，不吃键
+     */
+    private fun moveChip(code: Int): Boolean {
+        val cur = activity.currentFocus ?: return false
+        val dir = when (code) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> View.FOCUS_LEFT
+            KeyEvent.KEYCODE_DPAD_RIGHT -> View.FOCUS_RIGHT
+            KeyEvent.KEYCODE_DPAD_UP -> View.FOCUS_UP
+            else -> View.FOCUS_DOWN
+        }
+        val next = chipBox.move(cur, dir) ?: return false
+        next.requestFocus()
+        return true
+    }
 
     /** 回到列表第一行。播放全部、收藏夹工具条往下都落在这一行 */
     private fun focusFirstRow(): Boolean {

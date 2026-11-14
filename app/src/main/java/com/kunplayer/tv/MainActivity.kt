@@ -10,6 +10,9 @@ import android.os.SystemClock
 import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -146,7 +149,7 @@ class MainActivity : Activity() {
     private lateinit var lyricPreview: TextView
     private lateinit var setQualityVal: TextView
 
-    /** 关键词十行。下标就是按钮的位置，两处一一对应 */
+    /** 关键词十五行。下标就是按钮的位置，两处一一对应 */
     private val kwRows = ArrayList<View>()
     private val kwLabels = ArrayList<TextView>()
 
@@ -155,6 +158,14 @@ class MainActivity : Activity() {
     private lateinit var kwEcho: TextView
     private lateinit var kwReset: View
     private lateinit var kwKeypad: Keypad
+
+    /** 系统输入法那一层：一台电视上有没有中文输入法，只有开机看一眼才知道 */
+    private lateinit var kwImeRow: View
+    private lateinit var kwImeInput: EditText
+    private lateinit var kwImeOk: TextView
+    private lateinit var kwImeSwitch: TextView
+    private lateinit var kwCard: View
+    private var kwImeOn = false
 
     /** 正在改第几个词。-1 = 浮层没开 */
     private var kwEditing = -1
@@ -1606,8 +1617,66 @@ class MainActivity : Activity() {
         kwKeypad.ensureBuilt()
         kwKeypad.setInput("")
         kwScrim.visibility = View.VISIBLE
-        kwScrim.post { kwKeypad.focusFirst() }
+        // 有中文输入法就直接落在它上面。这一页要写的是「闽南语」这种词，
+        // 九宫格只能拼 a-z，明明装得下搜狗却让人一个字母一个字母敲，
+        // 是把难走的默认成了唯一能走的
+        applyImeMode(imeAvailable())
         Diag.enter("关键词编辑 ${index + 1}")
+    }
+
+    /**
+     * 在「电视输入法」和「九宫格」之间切。
+     *
+     * 两种形态都要照顾同一件事：卡片不能被键盘盖住。系统输入法在底部占掉一大块，
+     * 卡片还居中停着的话，输入框正好藏在它后面——所以这一档把卡片顶到上边去。
+     *
+     * 切到九宫格时把输入法里打的字接过来：在两套输入之间换一下不该丢掉已经打的字。
+     */
+    private fun applyImeMode(on: Boolean) {
+        kwImeOn = on
+        kwImeRow.visibility = if (on) View.VISIBLE else View.GONE
+        kwEcho.visibility = if (on) View.GONE else View.VISIBLE
+        findViewById<View>(R.id.kw_keypad).visibility = if (on) View.GONE else View.VISIBLE
+        kwImeSwitch.setText(if (on) R.string.kw_use_keypad else R.string.kw_use_ime)
+
+        val lp = kwCard.layoutParams as android.widget.FrameLayout.LayoutParams
+        lp.gravity = if (on) {
+            android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL
+        } else {
+            android.view.Gravity.CENTER
+        }
+        lp.topMargin = if (on) (40 * resources.displayMetrics.density).toInt() else 0
+        kwCard.layoutParams = lp
+
+        if (on) {
+            // 起手就带出这个槽位现在的词：多数时候是「改一两个字」，
+            // 从空开始等于逼人整词重打
+            val word = kwBuffer.ifEmpty {
+                Settings.keywords(this).getOrNull(kwEditing).orEmpty()
+            }
+            kwImeInput.setText(word)
+            kwImeInput.setSelection(kwImeInput.text.length)
+            kwImeInput.post {
+                kwImeInput.requestFocus()
+                imm()?.showSoftInput(kwImeInput, InputMethodManager.SHOW_IMPLICIT)
+            }
+        } else {
+            hideIme()
+            kwBuffer = kwImeInput.text?.toString().orEmpty()
+            paintKeywordEcho()
+            kwScrim.post { kwKeypad.focusFirst() }
+        }
+    }
+
+    private fun imm(): InputMethodManager? =
+        getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+
+    /** 这台电视有没有可用的输入法。没有就一辈子只走九宫格，界面上不多出一颗按钮 */
+    private fun imeAvailable(): Boolean = imm()?.enabledInputMethodList?.isNotEmpty() == true
+
+    private fun hideIme() {
+        if (!::kwImeInput.isInitialized) return
+        imm()?.hideSoftInputFromWindow(kwImeInput.windowToken, 0)
     }
 
     /**
@@ -1628,6 +1697,10 @@ class MainActivity : Activity() {
     private fun closeKeywordEditor() {
         kwEditing = -1
         kwBuffer = ""
+        // 关浮层要连键盘一起收：只把卡片藏起来，输入法会孤零零留在屏幕上，
+        // 人还不知道自己在往哪儿打字
+        hideIme()
+        kwImeOn = false
         kwScrim.visibility = View.GONE
     }
 
@@ -1641,6 +1714,19 @@ class MainActivity : Activity() {
             closeKeywordEditor()
             back?.requestFocus()
             return true
+        }
+        // 系统输入法那一档：字母、方向、删除都归它和 EditText，
+        // 这里再把字母抢进九宫格的 buffer，两边会各记一份、互相盖。
+        // 只留一个出口：单行 EditText 会把 ↓ 当成光标移动吃掉，
+        // 不接手的话遥控器一路按到屏幕底也出不了输入框
+        if (kwImeOn) {
+            if (currentFocus === kwImeInput &&
+                (code == KeyEvent.KEYCODE_DPAD_DOWN || code == KeyEvent.KEYCODE_DPAD_UP)
+            ) {
+                (if (code == KeyEvent.KEYCODE_DPAD_DOWN) kwImeOk else kwImeSwitch).requestFocus()
+                return true
+            }
+            return false
         }
         if (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT ||
             code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN
@@ -1667,8 +1753,35 @@ class MainActivity : Activity() {
 
     private fun buildKeywordEditor() {
         kwScrim = findViewById(R.id.kw_scrim)
+        kwCard = findViewById(R.id.kw_card)
         kwTitle = findViewById(R.id.kw_title)
         kwEcho = findViewById(R.id.kw_echo)
+        kwImeRow = findViewById(R.id.kw_ime_row)
+        kwImeInput = findViewById(R.id.kw_ime_input)
+        kwImeSwitch = findViewById(R.id.kw_ime_switch)
+        kwImeOk = findViewById(R.id.kw_ime_ok)
+        kwImeOk.setOnClickListener {
+            saveKeyword(kwImeInput.text.toString())
+        }
+        // 输入法键盘上那颗「完成」= 保存。电视输入法的回车不一定带 actionId，
+        // 所以顺带认一次 UNSPECIFIED 和回车键
+        kwImeInput.setOnEditorActionListener { _, actionId, _ ->
+            val done = actionId == EditorInfo.IME_ACTION_DONE ||
+                actionId == EditorInfo.IME_ACTION_UNSPECIFIED ||
+                actionId == EditorInfo.IME_ACTION_GO
+            if (done) saveKeyword(kwImeInput.text.toString())
+            done
+        }
+        kwImeSwitch.setOnClickListener { applyImeMode(!kwImeOn) }
+        // 焦点回到输入框就把键盘再叫出来：从「保存」按回上一行时，
+        // 人期望能接着打字，而不是对着一个没有键盘的输入框发愣
+        kwImeInput.setOnFocusChangeListener { _, has ->
+            if (has && kwImeOn) {
+                kwImeInput.post {
+                    imm()?.showSoftInput(kwImeInput, InputMethodManager.SHOW_IMPLICIT)
+                }
+            }
+        }
         kwKeypad = Keypad(
             container = findViewById(R.id.kw_keypad),
             onText = {
