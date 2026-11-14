@@ -785,9 +785,9 @@
     </ScrollView>
 
     <!-- ====================================================== 关键词编辑 -->
-    <!-- 复用搜索页那块九宫格：电视上没有可用的中文输入法，能打的只有 a-z，
-         而 B 站搜索吃拼音原文（`yueyu` 和「粤语」返回同一批结果）。
-         为了一件「偶尔改一次」的事重做一套输入法不值。 -->
+    <!-- 一个输入框、一颗保存。输入走电视自带输入法（这台机器是搜狗 TV 版），
+         「闽南语」这种词直接打出来，不用先拼 a-z 再指望 B 站认拼音。
+         卡片顶到上边：系统键盘从底部升起，居中的话输入框会被压在它后面。 -->
     <FrameLayout
         android:id="@+id/kw_scrim"
         android:layout_width="match_parent"
@@ -801,7 +801,8 @@
             android:id="@+id/kw_card"
             android:layout_width="400dp"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="40dp"
             android:background="@drawable/bg_picker"
             android:clickable="true"
             android:focusable="false"
@@ -819,30 +820,13 @@
                 android:textSize="17sp"
                 android:textColor="@color/text_primary" />
 
-            <TextView
-                android:id="@+id/kw_echo"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:paddingBottom="6dp"
-                android:textColor="@color/text_primary"
-                android:textSize="19sp" />
-
-            <!-- 系统输入法那一行。九宫格只能打 a-z，而这个电视自带中文输入法
-                 （搜狗 TV 版），要打「闽南语」三个字只能借它的词库。
-
-                 默认收着：没有装输入法的机器上，这一行永远不露出来，
-                 屏幕上是原来那套九宫格，一个字都不变。 -->
+            <!-- 输入框 + 保存。起手带出这个槽位现在的词，多数时候只是改一两个字 -->
             <LinearLayout
-                android:id="@+id/kw_ime_row"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="12dp"
                 android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:visibility="gone">
+                android:orientation="horizontal">
 
                 <com.kunplayer.tv.ui.ImeEditText
                     android:id="@+id/kw_ime_input"
@@ -876,43 +860,6 @@
                     android:textColor="@color/play_all_text"
                     android:textSize="15sp" />
             </LinearLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="@color/hairline" />
-
-            <!-- 输入方式切换。九宫格打不了汉字，系统输入法要连着 IME 一起用；
-                 两套各有各的用处（前者按键少、后者能打中文），所以给一个明确的开关，
-                 不做「自动猜你现在想用哪个」——猜错一次就要删掉重来。 -->
-            <TextView
-                android:id="@+id/kw_ime_switch"
-                android:layout_width="wrap_content"
-                android:layout_height="32dp"
-                android:layout_gravity="end"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_play_all"
-                android:clickable="true"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:gravity="center"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:text="@string/kw_use_ime"
-                android:textColor="@color/play_all_text"
-                android:textSize="13sp" />
-
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp">
-
-                <LinearLayout
-                    android:id="@+id/kw_keypad"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-            </FrameLayout>
         </LinearLayout>
     </FrameLayout>
 

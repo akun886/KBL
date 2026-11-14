@@ -40,7 +40,6 @@ import com.kunplayer.tv.ui.FavFolderPanel
 import com.kunplayer.tv.ui.FollowingPanel
 import com.kunplayer.tv.ui.HomeStage
 import com.kunplayer.tv.ui.ImeEditText
-import com.kunplayer.tv.ui.Keypad
 import com.kunplayer.tv.ui.NowPlaying
 import com.kunplayer.tv.ui.QrLogin
 import com.kunplayer.tv.ui.ScrollableLayoutManager
@@ -76,8 +75,8 @@ class MainActivity : Activity() {
         /** 左栏铺几条历史。文件里留十条，全铺出来靠滚动翻，见 paintSearchHistory */
         const val HIST_SHOWN = 10
 
-        /** 左栏同时看得见几行。540dp 屏减去输入回显与 231dp 的键盘，五行是上限 */
-        const val HIST_ROWS = 5
+        /** 左栏同时看得见几行。540dp 屏减去输入框与标题，八行是上限 */
+        const val HIST_ROWS = 8
 
         /** 一条历史的高度（37 的行 + 4 的间距），用来算滚动区的高度 */
         const val HIST_ROW_DP = 41
@@ -94,19 +93,13 @@ class MainActivity : Activity() {
     private lateinit var hintView: TextView
 
     private lateinit var searchPanel: View
-    private lateinit var searchField: TextView
     private lateinit var searchImeInput: ImeEditText
-    private lateinit var searchImeSwitch: TextView
-    private lateinit var searchKeypadBox: View
     private lateinit var searchList: RecyclerView
     private lateinit var searchNote: TextView
     private lateinit var searchHistBox: LinearLayout
     private lateinit var searchHistScroll: ScrollView
     private lateinit var searchHistTitle: TextView
     private val searchAdapter = TrackListAdapter(onClick = ::pickSearch)
-
-    /** 搜索页当前是不是走电视输入法。决定焦点往来和「清空」归谁 */
-    private var searchImeOn = false
 
     /** 系统键盘此刻是不是挂着。BACK 的第一次只收它，第二次才退这一层 */
     private var searchImeShown = false
@@ -167,31 +160,22 @@ class MainActivity : Activity() {
 
     private lateinit var kwScrim: View
     private lateinit var kwTitle: TextView
-    private lateinit var kwEcho: TextView
     private lateinit var kwReset: View
-    private lateinit var kwKeypad: Keypad
 
-    /** 系统输入法那一层：一台电视上有没有中文输入法，只有开机看一眼才知道 */
-    private lateinit var kwImeRow: View
     private lateinit var kwImeInput: ImeEditText
     private lateinit var kwImeOk: TextView
-    private lateinit var kwImeSwitch: TextView
-    private lateinit var kwCard: View
-    private var kwImeOn = false
 
     /** 关键词浮层的系统键盘此刻是不是挂着。BACK 第一次只收它 */
     private var kwImeShown = false
 
     /** 正在改第几个词。-1 = 浮层没开 */
     private var kwEditing = -1
-    private var kwBuffer = ""
 
     private lateinit var favFolderPanel: FavFolderPanel
     private lateinit var followingPanel: FollowingPanel
     private lateinit var spacePanel: SpacePanel
     private lateinit var colorPalette: ColorPalette
 
-    private lateinit var keypad: Keypad
     private lateinit var login: QrLogin
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -276,10 +260,7 @@ class MainActivity : Activity() {
         playerOverlay = findViewById(R.id.player_overlay)
 
         searchPanel = findViewById(R.id.search_panel)
-        searchField = findViewById(R.id.search_field)
         searchImeInput = findViewById(R.id.search_ime_input)
-        searchImeSwitch = findViewById(R.id.search_ime_switch)
-        searchKeypadBox = findViewById(R.id.search_keypad_box)
         searchList = findViewById(R.id.search_list)
         searchNote = findViewById(R.id.search_note)
         searchHistBox = findViewById(R.id.search_hist_box)
@@ -289,7 +270,7 @@ class MainActivity : Activity() {
         searchList.adapter = searchAdapter
         searchList.itemAnimator = null
 
-        // 输入法档没有「确认」这一步，边打边搜才跟手。
+        // 输入框没有「确认」这一步，边打边搜才跟手。
         // 仍然走 scheduleSearch 的防抖和「少于两字不搜」，只是不记历史——
         // 打到一半的「国」「国语」不该在历史里排成一串中间态。
         searchImeInput.addTextChangedListener(object : TextWatcher {
@@ -297,7 +278,7 @@ class MainActivity : Activity() {
             override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
             override fun afterTextChanged(s: Editable?) {
                 val t = s?.toString().orEmpty()
-                // 切档时把同一个串再写一遍不算「用户又打了一次」
+                // 点历史时把同一个串再写一遍不算「用户又打了一次」
                 if (t == query) return
                 setQuery(t)
                 scheduleSearch()
@@ -320,37 +301,42 @@ class MainActivity : Activity() {
             }
             done
         }
-        searchImeSwitch.setOnClickListener { applySearchImeMode(!searchImeOn) }
+        // 焦点回到输入框就把键盘叫出来：从结果区按上来是想改词，
+        // 对着一个没有键盘的输入框发愣不叫「可以改」。
+        // 走的时候必须收：搜狗在这台机器上不会因为输入框失焦自己收键盘，
+        // 焦点到了结果区、下半屏还压着一块键盘，那屏结果等于看不见
         searchImeInput.setOnFocusChangeListener { _, has ->
-            if (has && searchImeOn) showSearchIme()
+            if (has) showSearchIme() else hideSearchIme()
         }
         // 输入法会把 BACK 先吞掉（实测连按三次才轮到宿主），
         // onKeyPreIme 是它之前那道关口：第一次收键盘，第二次退搜索页。
-        // 不接管的话，键盘一收起就进入了「按返回没反应」的状态
+        //
+        // 收键盘的同时必须把焦点交给下面一格。只收键盘、焦点还留在输入框里的话，
+        // 搜狗收起后会把输入焦点再抢回去，下一次 BACK 又只走到「收一个已经收掉的键盘」
+        // 这一支——表现就是按返回没反应（真机实测，连按四次都不退）。
         searchImeInput.onBack = {
-            if (searchImeShown) hideSearchIme() else closeSearch()
-            true
+            if (searchImeShown && moveFocusOutOfInput()) {
+                hideSearchIme()
+                true
+            } else {
+                // 没结果也没历史：这一层本来就没什么可看的，一下退干净
+                closeSearch()
+                true
+            }
         }
-
-        keypad = Keypad(
-            container = findViewById<LinearLayout>(R.id.keypad),
-            onText = { text ->
-                setQuery(text)
-                scheduleSearch()
-            },
-            onSubmit = { text ->
-                setQuery(text)
-                searchJob?.cancel()
-                // 明确提交的这一次才记历史；防抖那些「打到一半」的词不记，
-                // 否则历史里会排出 q、qi、qin、qing…… 一屏中间态
-                searchJob = scope.launch { runSearch(text, record = true) }
-            },
-            extraLabel = getString(R.string.search_clear),
-            onExtra = {
-                Diag.confirm("清空搜索词")
-                keypad.clear()
-            },
-        )
+        // 键盘挂着时方向键也先落到输入法（它拿去选候选），handleKey 收不到。
+        // 上下要出输入框，只能在这道关口上接
+        searchImeInput.onDpad = { code ->
+            when (code) {
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    if (!focusFirstHistory()) focusSearchResults()
+                    true
+                }
+                // 顶上是屏幕边缘，没有可去的地方
+                KeyEvent.KEYCODE_DPAD_UP -> true
+                else -> false
+            }
+        }
 
         accountPanel = findViewById(R.id.account_panel)
         accountName = findViewById(R.id.account_name)
@@ -435,7 +421,6 @@ class MainActivity : Activity() {
             onOpenArtist = ::openArtistOf,
         )
 
-        paintSearchField()
         paintAccount()
     }
 
@@ -610,13 +595,10 @@ class MainActivity : Activity() {
         }
         if (searchPanel.visibility == View.VISIBLE) {
             if (code == KeyEvent.KEYCODE_BACK) {
-                // 字母卡开着：返回是「这个字母不要了」，不是「关掉整个搜索页」。
-                // 一次返回只退一层
-                if (keypad.dismissPicker()) return true
                 closeSearch()
                 return true
             }
-            // 焦点在历史条上：上下走历史，往右进左栏的输入区，往左没东西
+            // 焦点在历史条上：上下走历史，往左回输入框，往右进结果区
             if (code == KeyEvent.KEYCODE_DPAD_UP ||
                 code == KeyEvent.KEYCODE_DPAD_DOWN ||
                 code == KeyEvent.KEYCODE_DPAD_LEFT ||
@@ -624,86 +606,19 @@ class MainActivity : Activity() {
             ) {
                 if (histKey(code)) return true
             }
-            // 输入法档：先给输入框留出口。单行 EditText 会把 ↑↓ 当成光标移动
-            // 吃掉，遥控器一路按到屏幕底也出不去——上一格是历史、下一格是结果，
-            // 和九宫格那档落在同一个地方。左右是光标移动，交给输入框自己
-            if (searchImeOn) {
-                if (currentFocus === searchImeInput) {
-                    when (code) {
-                        KeyEvent.KEYCODE_DPAD_UP -> {
-                            if (!focusLastHistory()) focusSearchResults()
-                            return true
-                        }
-                        KeyEvent.KEYCODE_DPAD_DOWN -> {
-                            focusSearchResults()
-                            return true
-                        }
-                        // 光标已经到末尾时，→ 没有字可过，交给旁边那颗切换钮；
-                        // 没到末尾还是让输入框自己移光标——改中间的字要靠它
-                        KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                            if (searchImeInput.selectionEnd >= searchImeInput.text.length) {
-                                searchImeSwitch.requestFocus()
-                                return true
-                            }
-                        }
-                        else -> Unit
+            // 单行 EditText 会把 ↑↓ 当成光标移动吃掉，遥控器一路按到屏幕底也出不去。
+            // 输入框下面是历史、再往下是结果，和几何位置对得上；
+            // 左右是光标移动，交给输入框自己——改中间的字要靠它
+            if (currentFocus === searchImeInput) {
+                when (code) {
+                    KeyEvent.KEYCODE_DPAD_DOWN -> {
+                        if (!focusFirstHistory()) focusSearchResults()
+                        return true
                     }
-                }
-                if (currentFocus === searchImeSwitch) {
-                    when (code) {
-                        // 切换钮往下是结果区：这颗按钮在顶部，
-                        // 不接管的话往下会走到历史或直接落空
-                        KeyEvent.KEYCODE_DPAD_DOWN -> {
-                            focusSearchResults()
-                            return true
-                        }
-                        // 往左、往上都回输入框：它就贴在输入行右边
-                        KeyEvent.KEYCODE_DPAD_LEFT -> {
-                            focusLeftInput()
-                            return true
-                        }
-                        KeyEvent.KEYCODE_DPAD_UP -> {
-                            if (!focusLastHistory()) focusLeftInput()
-                            return true
-                        }
-                        else -> Unit
-                    }
-                }
-            }
-            // 焦点在键盘上时，方向键先走 Keypad 自己的算术导航。
-            // 键宽相等但排列是 3+3+3+4，交给 FocusFinder 的几何搜索会在
-            // 字母格与功能键之间乱跳；自己算格号才发现得了「这一下该出左栏了」。
-            if (keypad.contains(currentFocus)) {
-                val moved = when (code) {
-                    KeyEvent.KEYCODE_DPAD_LEFT,
-                    KeyEvent.KEYCODE_DPAD_RIGHT,
-                    KeyEvent.KEYCODE_DPAD_UP,
-                    KeyEvent.KEYCODE_DPAD_DOWN,
-                    -> keypad.move(code)
-                    else -> false
-                }
-                if (moved) return true
-                // move() 返回 false 说明上下越界。
-                if (code == KeyEvent.KEYCODE_DPAD_UP) {
-                    // 键盘顶上就是历史。没有历史就去输入行那颗切换钮——
-                    // 它正好在上方，人想换回系统输入法，第一直觉就是往上按。
-                    // 机器上没输入法时那颗钮是死的，才往右栏够结果
-                    if (!focusLastHistory()) {
-                        if (imeAvailable()) searchImeSwitch.requestFocus() else focusSearchResults()
-                    }
-                    return true
-                }
-                // 最后一排再往下：结果区第一行。键盘到底了，下面没有别的控件，
-                // 这个键不交出去就等于告诉用户「下面没了」——而右边整屏都是结果
-                if (code == KeyEvent.KEYCODE_DPAD_DOWN) {
-                    focusSearchResults()
-                    return true
-                }
-                // 最右一列再往右：结果区第一行。
-                // 右边半屏就是结果，按右却卡在「清空」上不动，是最容易被骂的那种「没反应」
-                if (code == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                    focusSearchResults()
-                    return true
+                    // 顶部没有可去的地方：吃掉，别让 FocusFinder 把焦点
+                    // 拽到屏幕外某个看不见的控件上
+                    KeyEvent.KEYCODE_DPAD_UP -> return true
+                    else -> Unit
                 }
             }
             if (code == KeyEvent.KEYCODE_DPAD_RIGHT && inSearchResults()) {
@@ -718,21 +633,7 @@ class MainActivity : Activity() {
                 focusLeftInput()
                 return true
             }
-            // 输入法档下的字母、回车、删除全归输入框：这里再抢一次
-            // keypad.type 会让两边各记一份——屏幕上输入框是「国语」，
-            // 实际发出去的搜索词却是 buffer 里那几个字母
-            if (searchImeOn) return false
-            // 遥控器没有字母键，但插了 USB 键盘或用手机遥控 App 时能直接打。
-            // 这一条也让「先打几个字母再挑结果」在调试时可用
-            val ch = event.unicodeChar.toChar()
-            if (ch.isLetterOrDigit()) {
-                keypad.type(ch.lowercaseChar())
-                return true
-            }
-            if (code == KeyEvent.KEYCODE_DEL) {
-                keypad.backspace()
-                return true
-            }
+            // 字母、回车、删除全归输入框：焦点在它身上时按键自己会落到 EditText 里
             return false
         }
         // 作者主页从播放页点歌手打开时，它被提到了最上层，按键归它
@@ -870,7 +771,6 @@ class MainActivity : Activity() {
 
     private fun openSearch() {
         searchPanel.visibility = View.VISIBLE
-        keypad.ensureBuilt()
         // 每次打开都从空白开始：上一轮搜过的词、上一轮的结果，一样都不留。
         //
         // 不留的理由不是「干净」，而是留着会骗人：输入框还写着旧词，于是
@@ -878,48 +778,16 @@ class MainActivity : Activity() {
         // 空荡荡的左栏和上一次的结果，结论只能是「搜索历史没保存」。
         // 文件里其实一条不少（0.27.0 真机上就是这么被当成 bug 的）。
         setQuery("")
-        keypad.setInput("")
         searchImeInput.setText("")
         searchAdapter.submit(emptyList())
         note(R.string.search_none)
         paintSearchHistory()
-        // 默认落在电视输入法上：这个框要写的是中文歌名、歌手、专辑，
-        // 九宫格一个汉字都打不出来。机器上没输入法时自动退回九宫格
-        applySearchImeMode(imeAvailable())
-        Diag.confirm("打开搜索")
-    }
-
-    /**
-     * 搜索页在「电视输入法」和「九宫格」之间切。
-     *
-     * 切档要把已经打的字带过去：在两套输入之间换一下不该丢字——
-     * 拼音打了一半发现没装输入法、或者反过来，都还是同一个搜索词。
-     */
-    private fun applySearchImeMode(on: Boolean) {
-        searchImeOn = on
-        searchImeInput.visibility = if (on) View.VISIBLE else View.GONE
-        searchField.visibility = if (on) View.GONE else View.VISIBLE
-        searchKeypadBox.visibility = if (on) View.GONE else View.VISIBLE
-        searchImeSwitch.setText(if (on) R.string.kw_use_keypad else R.string.kw_use_ime)
-        // 机器上没装输入法时这颗钮没有去处：藏起来，别让人按进一个打不出字的输入框
-        searchImeSwitch.visibility = if (imeAvailable()) View.VISIBLE else View.GONE
-
-        if (on) {
-            if (searchImeInput.text?.toString() != query) {
-                searchImeInput.setText(query)
-                searchImeInput.setSelection(searchImeInput.text.length)
-            }
-            searchImeInput.post {
-                searchImeInput.requestFocus()
-                showSearchIme()
-            }
-        } else {
-            hideSearchIme()
-            keypad.ensureBuilt()
-            keypad.setInput(query)
-            paintSearchField()
-            searchPanel.post { keypad.focusFirst() }
+        // 进来就落在输入框上并把键盘带出来：这一页唯一要做的第一件事就是打字
+        searchImeInput.post {
+            searchImeInput.requestFocus()
+            showSearchIme()
         }
+        Diag.confirm("打开搜索")
     }
 
     private fun showSearchIme() {
@@ -934,15 +802,11 @@ class MainActivity : Activity() {
         imm()?.hideSoftInputFromWindow(searchImeInput.windowToken, 0)
     }
 
-    /** 左栏的输入焦点归谁：输入法档是输入框，九宫格档是键盘 */
+    /** 左栏只有一个输入框：焦点回它，顺手把键盘带出来 */
     private fun focusLeftInput() {
-        if (searchImeOn) {
-            searchImeInput.post {
-                searchImeInput.requestFocus()
-                showSearchIme()
-            }
-        } else {
-            keypad.focusFirst()
+        searchImeInput.post {
+            searchImeInput.requestFocus()
+            showSearchIme()
         }
     }
 
@@ -950,19 +814,17 @@ class MainActivity : Activity() {
      * 左栏的历史条。
      *
      * 文件里存 [SearchHistory] 的十条，这里全铺出来，靠外面那层 ScrollView 翻：
-     * 左栏一次只放得下五行（键盘占 231dp，上面还有输入回显），但「存了十条只给看五条」
-     * 等于没存——第六条往后永远见不到，用户还是会说历史丢了。
+     * 左栏一屏放得下八行，但「存了十条只给看八条」也算没存——第九条往后滚动去见。
      *
-     * 每条都是可聚焦的：进搜索页光标落在键盘上，按上就落到最近的那一条，
-     * 按确认再搜一次。这是把历史摆出来的全部理由——重搜一个老词不该从空白键盘重新打。
+     * 每条都是可聚焦的：进搜索页光标落在输入框上，按一下就落到第一条，
+     * 按确认再搜一次。这是把历史摆出来的全部理由——重搜一个老词不该从头重新打。
      */
     private fun paintSearchHistory() {
-        // 输入框里有字时左栏要留给键盘：刚打开搜索页时显示历史，
-        // 一开始打第一个字母历史就收起来。不收的话键盘被挤到屏幕下沿，
-        // 打「zhoujielun」时手指按在屏幕外——历史是「进来时」的入口，不是常驻面板。
+        // 输入框里有字时历史收起来：刚打开搜索页时显示历史，
+        // 一开始打字就换成结果——历史是「进来时」的入口，不是常驻面板。
         //
-        // 收起的同时必须把 histViews 清掉。只藏 view 不清账，就会留下四个
-        // 「不可见但还登记着」的行：键盘顶行按上时 focusLastHistory() 拿到它们、
+        // 收起的同时必须把 histViews 清掉。只藏 view 不清账，就会留下几条
+        // 「不可见但还登记着」的行：输入框按 ↓ 时 focusFirstHistory() 拿到它们、
         // requestFocus 落空，焦点停在一块 GONE 的容器里——屏幕上没有任何高亮，
         // 之后每个方向键都像按在空处（0.27.0 的实测就是这样）。
         if (query.isNotEmpty()) {
@@ -982,8 +844,8 @@ class MainActivity : Activity() {
         }
         searchHistScroll.visibility = View.VISIBLE
         searchHistTitle.visibility = View.VISIBLE
-        // 高度按实际条数给，最多五行：留死值的话两条历史也占满一屏，键盘被顶出屏幕；
-        // 不限高的话第六条起就溢出——文件里存着十条，界面上只看得见五条等于没存
+        // 高度按实际条数给，最多八行：留死值的话两条历史也占满一屏；
+        // 不限高的话第九条起就溢出——文件里存着十条，界面上只看得见八条等于没存
         val d = resources.displayMetrics.density
         val rows = minOf(words.size, HIST_ROWS)
         searchHistScroll.layoutParams = searchHistScroll.layoutParams.apply {
@@ -1014,8 +876,7 @@ class MainActivity : Activity() {
     /** 点一条历史：填回输入框并立刻搜一次，同时把这个词挪到最前 */
     private fun reuseSearch(word: String) {
         setQuery(word)
-        keypad.setInput(word)
-        // 输入法档的输入框也得跟上：不然屏幕上还停着刚才那个词，
+        // 输入框得跟上：不然屏幕上还停着刚才那个词，
         // 结果却已经换成这一条历史的了
         if (searchImeInput.text?.toString() != word) {
             searchImeInput.setText(word)
@@ -1029,23 +890,29 @@ class MainActivity : Activity() {
     }
 
     /**
-     * 键盘顶行再往上：落在历史最后一条（离键盘最近的那条）。
+     * 把焦点从输入框挪到下面那一格：历史第一条，或结果第一行。
+     * 返回 false 表示这一页眼下没有可去的下一格。
+     */
+    private fun moveFocusOutOfInput(): Boolean =
+        focusFirstHistory() || focusSearchResults()
+
+    /**
+     * 输入框往下：落在历史第一条。
      *
      * 返回 requestFocus 的**真实结果**，不是「有没有历史」：历史区藏着的时候
      * histViews 已经被清空，但如果哪天忘了清，这里返回 true 就会把焦点吞掉——
      * 屏幕上一个高亮都没有，而调用方以为「已经交给历史了」，不再往下走。
      */
-    private fun focusLastHistory(): Boolean {
-        val last = histViews.lastOrNull() ?: return false
-        return last.requestFocus()
+    private fun focusFirstHistory(): Boolean {
+        val first = histViews.firstOrNull() ?: return false
+        return first.requestFocus()
     }
 
     /**
      * 历史条上的方向键。
      *
-     * 上下在历史之间走；往下走出最后一条就进货键盘——但**落在「清空」而不是最左**，
-     * 因为人是从历史往下摸到键盘的，接着要按的多半是重新打一个词，
-     * 而落在字母区第一格会让他发现刚才按的两下白按了。
+     * 上下在历史之间走；往上走出第一条回输入框，往下走出最后一条进货架（结果区）。
+     * 左回输入框、右进结果区——历史条铺满左栏，右边紧挨着分栏线。
      */
     private fun histKey(code: Int): Boolean {
         val cur = currentFocus as? TextView ?: return false
@@ -1054,22 +921,20 @@ class MainActivity : Activity() {
         when (code) {
             KeyEvent.KEYCODE_DPAD_UP -> {
                 val prev = histViews.getOrNull(at - 1)
-                // 已经到最上面那条：再往上就是输入行的切换钮。
-                // 这里不接管的话焦点会卡在第一条历史上，想换回系统输入法只能退出去重进
-                if (prev != null) prev.requestFocus() else searchImeSwitch.requestFocus()
+                if (prev != null) prev.requestFocus() else focusLeftInput()
                 return true
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> {
                 val next = histViews.getOrNull(at + 1)
-                if (next != null) next.requestFocus() else focusLeftInput()
+                if (next != null) next.requestFocus() else focusSearchResults()
                 return true
             }
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                focusLeftInput()
+                focusSearchResults()
                 return true
             }
             KeyEvent.KEYCODE_DPAD_LEFT -> {
-                // 历史条在最左，左边没有别的控件；回输入区比什么都不做强
+                // 历史条在最左，左边没有别的控件；回输入框比什么都不做强
                 focusLeftInput()
                 return true
             }
@@ -1078,9 +943,7 @@ class MainActivity : Activity() {
     }
 
     private fun closeSearch() {
-        // 字母卡是叠在键盘上的独立一层，面板 GONE 带不走它
-        keypad.dismissPicker()
-        // 系统输入法也一样：只藏面板不收键盘，键盘会孤零零留在屏幕上，
+        // 系统输入法要收掉：只藏面板不收键盘，键盘会孤零零留在屏幕上，
         // 人还不知道自己在往哪儿打字
         hideSearchIme()
         searchPanel.visibility = View.GONE
@@ -1089,13 +952,14 @@ class MainActivity : Activity() {
         if (playerOpen) toCover() else home.focusSearch()
     }
 
-    /** 键盘往上：点亮结果列表的第一行。列表还空着就停在原地 */
-    private fun focusSearchResults() {
-        if (searchAdapter.itemCount == 0) return
+    /** 输入框往下、或结果列表往上：点亮结果列表的第一行。返回 false 表示还是空的 */
+    private fun focusSearchResults(): Boolean {
+        if (searchAdapter.itemCount == 0) return false
         searchList.post {
             (searchList.layoutManager as? LinearLayoutManager)?.scrollToPositionWithOffset(0, 0)
             searchList.post { searchRow(0)?.requestFocus() }
         }
+        return true
     }
 
     private fun searchRow(position: Int): View? {
@@ -1114,24 +978,13 @@ class MainActivity : Activity() {
     }
 
     /**
-     * 换搜索词只从这一个口子进：输入框、左栏的构成（有字就收历史）都跟着这一处走。
-     * 分散在三四个地方各写一遍 `query = ...`，迟早漏掉一处——表现是
-     * 「历史还摆着，键盘却被挤到屏幕下沿」这种半新半旧的状态。
+     * 换搜索词只从这一个口子进：输入框的字、左栏的构成（有字就收历史）都跟着这一处走。
+     * 分散在三四五个地方各写一遍 `query = ...`，迟早漏掉一处——表现是
+     * 「历史还摆着，结果却已经换成新词」这种半新半旧的状态。
      */
     private fun setQuery(text: String) {
         query = text
-        paintSearchField()
-    }
-
-    private fun paintSearchField() {
-        if (query.isEmpty()) {
-            searchField.text = getString(R.string.search_placeholder)
-            searchField.setTextColor(getColor(R.color.text_secondary))
-        } else {
-            searchField.text = query
-            searchField.setTextColor(getColor(R.color.text_primary))
-        }
-        // 输入行一变，左栏的构成也跟着变（有字就收历史），一处改两处画
+        // 输入行的字由 EditText 自己画，这里只管左栏的构成
         if (searchHistScroll.visibility == View.VISIBLE || query.isEmpty()) paintSearchHistory()
     }
 
@@ -1798,71 +1651,23 @@ class MainActivity : Activity() {
     private fun openKeywordEditor(index: Int) {
         if (index !in 0 until Settings.KEYWORD_SLOTS) return
         kwEditing = index
-        // 起手是空的：遥控器上只能打 a-z，把「国语」两个字塞进 buffer 之后
-        // 再按字母会变成「国语yueyu」——用户根本删不掉那两个字
-        kwBuffer = ""
         kwTitle.text = getString(R.string.kw_editor_title, index + 1)
-        paintKeywordEcho()
-        kwKeypad.ensureBuilt()
-        kwKeypad.setInput("")
+        // 起手带出这个槽位现在的词：多数时候是「改一两个字」，
+        // 从空开始等于逼人整词重打
+        val word = Settings.keywords(this).getOrNull(index).orEmpty()
+        kwImeInput.setText(word)
+        kwImeInput.setSelection(word.length)
         kwScrim.visibility = View.VISIBLE
-        // 有中文输入法就直接落在它上面。这一页要写的是「闽南语」这种词，
-        // 九宫格只能拼 a-z，明明装得下搜狗却让人一个字母一个字母敲，
-        // 是把难走的默认成了唯一能走的
-        applyImeMode(imeAvailable())
+        kwImeInput.post {
+            kwImeInput.requestFocus()
+            kwImeShown = true
+            imm()?.showSoftInput(kwImeInput, InputMethodManager.SHOW_IMPLICIT)
+        }
         Diag.enter("关键词编辑 ${index + 1}")
-    }
-
-    /**
-     * 在「电视输入法」和「九宫格」之间切。
-     *
-     * 两种形态都要照顾同一件事：卡片不能被键盘盖住。系统输入法在底部占掉一大块，
-     * 卡片还居中停着的话，输入框正好藏在它后面——所以这一档把卡片顶到上边去。
-     *
-     * 切到九宫格时把输入法里打的字接过来：在两套输入之间换一下不该丢掉已经打的字。
-     */
-    private fun applyImeMode(on: Boolean) {
-        kwImeOn = on
-        kwImeRow.visibility = if (on) View.VISIBLE else View.GONE
-        kwEcho.visibility = if (on) View.GONE else View.VISIBLE
-        findViewById<View>(R.id.kw_keypad).visibility = if (on) View.GONE else View.VISIBLE
-        kwImeSwitch.setText(if (on) R.string.kw_use_keypad else R.string.kw_use_ime)
-
-        val lp = kwCard.layoutParams as android.widget.FrameLayout.LayoutParams
-        lp.gravity = if (on) {
-            android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL
-        } else {
-            android.view.Gravity.CENTER
-        }
-        lp.topMargin = if (on) (40 * resources.displayMetrics.density).toInt() else 0
-        kwCard.layoutParams = lp
-
-        if (on) {
-            // 起手就带出这个槽位现在的词：多数时候是「改一两个字」，
-            // 从空开始等于逼人整词重打
-            val word = kwBuffer.ifEmpty {
-                Settings.keywords(this).getOrNull(kwEditing).orEmpty()
-            }
-            kwImeInput.setText(word)
-            kwImeInput.setSelection(kwImeInput.text.length)
-            kwImeInput.post {
-                kwImeInput.requestFocus()
-                kwImeShown = true
-                imm()?.showSoftInput(kwImeInput, InputMethodManager.SHOW_IMPLICIT)
-            }
-        } else {
-            hideIme()
-            kwBuffer = kwImeInput.text?.toString().orEmpty()
-            paintKeywordEcho()
-            kwScrim.post { kwKeypad.focusFirst() }
-        }
     }
 
     private fun imm(): InputMethodManager? =
         getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
-
-    /** 这台电视有没有可用的输入法。没有就一辈子只走九宫格，界面上不多出一颗按钮 */
-    private fun imeAvailable(): Boolean = imm()?.enabledInputMethodList?.isNotEmpty() == true
 
     private fun hideIme() {
         if (!::kwImeInput.isInitialized) return
@@ -1870,28 +1675,11 @@ class MainActivity : Activity() {
         imm()?.hideSoftInputFromWindow(kwImeInput.windowToken, 0)
     }
 
-    /**
-     * 输入回显。空的时候显示这个词现在是什么（灰色），
-     * 有字就显示正在打的串（白色）——和搜索页那个输入框同一个规矩。
-     */
-    private fun paintKeywordEcho() {
-        if (kwBuffer.isEmpty()) {
-            val now = Settings.keywords(this).getOrNull(kwEditing).orEmpty()
-            kwEcho.text = if (now.isEmpty()) getString(R.string.kw_editor_hint) else now
-            kwEcho.setTextColor(getColor(R.color.text_secondary))
-        } else {
-            kwEcho.text = kwBuffer
-            kwEcho.setTextColor(getColor(R.color.text_primary))
-        }
-    }
-
     private fun closeKeywordEditor() {
         kwEditing = -1
-        kwBuffer = ""
         // 关浮层要连键盘一起收：只把卡片藏起来，输入法会孤零零留在屏幕上，
         // 人还不知道自己在往哪儿打字
         hideIme()
-        kwImeOn = false
         kwScrim.visibility = View.GONE
     }
 
@@ -1902,59 +1690,32 @@ class MainActivity : Activity() {
         back?.requestFocus()
     }
 
-    /** 键盘浮层的按键：返回只退这一层，方向键归九宫格 */
+    /** 关键词浮层的按键：返回只退这一层，上下给输入框留出口 */
     private fun kwKey(event: KeyEvent): Boolean {
         val code = event.keyCode
         if (code == KeyEvent.KEYCODE_BACK) {
-            // 字母卡开着时先收卡：一次返回只退一层
-            if (kwKeypad.dismissPicker()) return true
+            // 键盘收没收由输入框的 pre-IME 通道先判：第一次收键盘，第二次退浮层
             exitKeywordEditor()
             return true
         }
-        // 系统输入法那一档：字母、方向、删除都归它和 EditText，
-        // 这里再把字母抢进九宫格的 buffer，两边会各记一份、互相盖。
-        // 只留一个出口：单行 EditText 会把 ↓ 当成光标移动吃掉，
-        // 不接手的话遥控器一路按到屏幕底也出不了输入框
-        if (kwImeOn) {
-            if (currentFocus === kwImeInput &&
-                (code == KeyEvent.KEYCODE_DPAD_DOWN || code == KeyEvent.KEYCODE_DPAD_UP)
-            ) {
-                (if (code == KeyEvent.KEYCODE_DPAD_DOWN) kwImeOk else kwImeSwitch).requestFocus()
-                return true
+        // 单行 EditText 会把 ↑↓ 当成光标移动吃掉，遥控器一路按到屏幕底也出不了输入框。
+        // 下面一格是「保存」，上面没有东西
+        if (currentFocus === kwImeInput) {
+            when (code) {
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    kwImeOk.requestFocus()
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> return true
             }
-            return false
-        }
-        if (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT ||
-            code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN
-        ) {
-            if (kwKeypad.contains(currentFocus)) {
-                // 键盘到边界时 move() 返回 false：这一层没有别的东西可去，
-                // 吃掉按键，别让焦点跑到浮层背后的设置页上
-                kwKeypad.move(code)
-                return true
-            }
-            return false
-        }
-        val ch = event.unicodeChar.toChar()
-        if (ch.isLetterOrDigit()) {
-            kwKeypad.type(ch.lowercaseChar())
-            return true
-        }
-        if (code == KeyEvent.KEYCODE_DEL) {
-            kwKeypad.backspace()
-            return true
         }
         return false
     }
 
     private fun buildKeywordEditor() {
         kwScrim = findViewById(R.id.kw_scrim)
-        kwCard = findViewById(R.id.kw_card)
         kwTitle = findViewById(R.id.kw_title)
-        kwEcho = findViewById(R.id.kw_echo)
-        kwImeRow = findViewById(R.id.kw_ime_row)
         kwImeInput = findViewById(R.id.kw_ime_input)
-        kwImeSwitch = findViewById(R.id.kw_ime_switch)
         kwImeOk = findViewById(R.id.kw_ime_ok)
         kwImeOk.setOnClickListener {
             saveKeyword(kwImeInput.text.toString())
@@ -1968,36 +1729,45 @@ class MainActivity : Activity() {
             if (done) saveKeyword(kwImeInput.text.toString())
             done
         }
-        kwImeSwitch.setOnClickListener { applyImeMode(!kwImeOn) }
         // 输入法把 BACK 据为己有（要连按三次才轮到宿主），走 pre-IME 那道关口：
-        // 第一次收键盘，第二次退浮层、光标回原来那一行
+        // 第一次收键盘，第二次退浮层、光标回原来那一行。
+        // 收键盘时把焦点交给「保存」：留在输入框里的话，搜狗会把输入焦点再抢回去，
+        // 下一次 BACK 又落在「收一个已经收掉的键盘」上，按几下都不退
         kwImeInput.onBack = {
-            if (kwImeShown) hideIme() else exitKeywordEditor()
-            true
-        }
-        // 焦点回到输入框就把键盘再叫出来：从「保存」按回上一行时，
-        // 人期望能接着打字，而不是对着一个没有键盘的输入框发愣
-        kwImeInput.setOnFocusChangeListener { _, has ->
-            if (has && kwImeOn) {
-                kwImeInput.post {
-                    imm()?.showSoftInput(kwImeInput, InputMethodManager.SHOW_IMPLICIT)
-                }
+            if (kwImeShown) {
+                kwImeOk.requestFocus()
+                hideIme()
+                true
+            } else {
+                exitKeywordEditor()
+                true
             }
         }
-        kwKeypad = Keypad(
-            container = findViewById(R.id.kw_keypad),
-            onText = {
-                kwBuffer = it
-                paintKeywordEcho()
-            },
-            onSubmit = { saveKeyword(it) },
-            submitLabel = getString(R.string.kw_save),
-            // 四颗功能键铺满一行：空格 / 删除 / 确定 / 取消。
-            // 取消不给返回键当替身——遥控器上那颗键的意思和「这次不改了」不一样，
-            // 一个是退，一个是「我知道我没改」
-            extraLabel = getString(R.string.fav_folder_cancel),
-            onExtra = { exitKeywordEditor() },
-        )
+        // 键盘挂着时方向键先被输入法吃掉（它拿去选候选），handleKey 收不到。
+        // 往下走到「保存」只能在这道关口上接
+        kwImeInput.onDpad = { code ->
+            when (code) {
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    kwImeOk.requestFocus()
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> true
+                else -> false
+            }
+        }
+        // 焦点回到输入框就把键盘再叫出来：从「保存」按回上一行时，
+        // 人期望能接着打字，而不是对着一个没有键盘的输入框发愣。
+        // 走的时候要收——键盘压在底部，它一立起来正好盖住「保存」
+        kwImeInput.setOnFocusChangeListener { _, has ->
+            if (has) {
+                kwImeInput.post {
+                    kwImeShown = true
+                    imm()?.showSoftInput(kwImeInput, InputMethodManager.SHOW_IMPLICIT)
+                }
+            } else {
+                hideIme()
+            }
+        }
     }
 
     private fun saveKeyword(text: String) {

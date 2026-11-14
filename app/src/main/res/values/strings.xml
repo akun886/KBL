@@ -71,7 +71,7 @@
     <string name="fav_del_folder">删除收藏夹</string>
     <string name="fav_folder_new_title">新建收藏夹</string>
     <string name="fav_folder_del_title">删除收藏夹</string>
-    <string name="fav_folder_hint">起个名字，用字母</string>
+    <string name="fav_folder_hint">起个名字</string>
     <string name="fav_folder_ok">确定</string>
     <string name="fav_folder_cancel">取消</string>
     <string name="fav_folder_created">已建收藏夹《%1$s》</string>
@@ -100,13 +100,12 @@
     <string name="space_no_mid">这个来源没给作者 id，进不了主页</string>
     <string name="space_finding">正在找这位 UP 主…</string>
 
-    <string name="search_placeholder">输入拼音搜索</string>
+    <string name="search_placeholder">输入歌名或歌手</string>
     <string name="search_empty">没有找到相关歌曲</string>
-    <string name="search_none">输入拼音开始搜索</string>
+    <string name="search_none">输入歌名或歌手开始搜索</string>
     <string name="search_failed">搜索失败，换个词再试</string>
     <!-- 左栏历史区的标题。只在有历史时出现 -->
     <string name="search_hist">最近搜过</string>
-    <string name="search_clear">清空</string>
 
     <string name="history_need_login">登录后显示播放历史</string>
     <string name="history_empty">还没有播放记录</string>
@@ -213,14 +212,11 @@
     <string name="quality_normal">标准</string>
     <string name="quality_low">流畅</string>
     <string name="quality_now">音质：%1$s</string>
-    <!-- 关键词编辑浮层。电视上只能打 a-z，而 B 站搜索吃拼音原文 -->
+    <!-- 关键词编辑浮层 -->
     <string name="kw_editor_title">关键词 %1$d</string>
-    <string name="kw_editor_hint">输入拼音</string>
     <string name="kw_saved">关键词 %1$d：%2$s</string>
     <string name="kw_save">保存</string>
     <string name="kw_ime_hint">输入关键词</string>
-    <string name="kw_use_ime">用电视输入法</string>
-    <string name="kw_use_keypad">用九宫格</string>
     <string name="kw_reset_done">关键词已恢复默认</string>
     <string name="color_cyan">青</string>
     <string name="color_violet">紫</string>

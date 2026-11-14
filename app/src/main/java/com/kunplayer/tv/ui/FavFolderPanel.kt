@@ -5,7 +5,8 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -45,8 +46,7 @@ class FavFolderPanel(
     private val panel: View = activity.findViewById(R.id.fav_folder_panel)
     private val heading: TextView = activity.findViewById(R.id.fav_folder_heading)
     private val createBox: View = activity.findViewById(R.id.fav_folder_create)
-    private val input: TextView = activity.findViewById(R.id.fav_folder_input)
-    private val keysBox: LinearLayout = activity.findViewById(R.id.fav_folder_keys)
+    private val input: ImeEditText = activity.findViewById(R.id.fav_folder_input)
     private val okBtn: TextView = activity.findViewById(R.id.fav_folder_ok)
     private val cancelBtn: TextView = activity.findViewById(R.id.fav_folder_cancel)
     private val delBox: View = activity.findViewById(R.id.fav_folder_del)
@@ -54,14 +54,10 @@ class FavFolderPanel(
     private val note: TextView = activity.findViewById(R.id.fav_folder_note)
     private val delCancel: TextView = activity.findViewById(R.id.fav_folder_del_cancel)
 
-    private val keypad = Keypad(
-        container = keysBox,
-        onText = { text -> paintInput(text) },
-        onSubmit = { submitCreate() },
-        submitLabel = activity.getString(R.string.fav_folder_ok),
-    )
-
     private val adapter = FolderAdapter()
+
+    /** 输入法键盘此刻是不是挂着。BACK 第一次只收它，第二次才关面板 */
+    private var imeShown = false
 
     /** 正在等第二次确认的收藏夹 id */
     private var pendingId = 0L
@@ -79,6 +75,60 @@ class FavFolderPanel(
         okBtn.setOnClickListener { submitCreate() }
         cancelBtn.setOnClickListener { dismiss() }
         delCancel.setOnClickListener { dismiss() }
+        // 输入法的回车 = 确定。电视输入法的回车不一定带 actionId，一并认 UNSPECIFIED
+        input.setOnEditorActionListener { _, actionId, _ ->
+            val done = actionId == EditorInfo.IME_ACTION_DONE ||
+                actionId == EditorInfo.IME_ACTION_UNSPECIFIED ||
+                actionId == EditorInfo.IME_ACTION_GO
+            if (done) submitCreate()
+            done
+        }
+        // 输入法会把 BACK 先吞掉（实测要连按三次才轮到宿主），
+        // onKeyPreIme 是它之前那道关口：第一次收键盘，第二次关面板。
+        // 收键盘时把焦点交给「确定」：留在输入框里的话搜狗会把输入焦点再抢回去，
+        // 下一次 BACK 又去收一个已经收掉的键盘，按几下都不关
+        input.onBack = {
+            if (imeShown) {
+                okBtn.requestFocus()
+                hideIme()
+                true
+            } else {
+                dismissAndReturnFocus()
+                true
+            }
+        }
+        // 键盘挂着时方向键先被输入法吃掉（它拿去选候选），handleKey 收不到。
+        // 往下走到「确定」只能在这道关口上接
+        input.onDpad = { code ->
+            when (code) {
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    okBtn.requestFocus()
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> true
+                else -> false
+            }
+        }
+        // 焦点回到输入框就把键盘叫出来：从「确定」按回上一行是还想接着打。
+        // 走的时候要收——键盘立起来正好盖住底部那两颗按钮
+        input.setOnFocusChangeListener { _, has ->
+            if (has) {
+                input.post {
+                    imeShown = true
+                    imm()?.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
+                }
+            } else {
+                hideIme()
+            }
+        }
+    }
+
+    private fun imm(): InputMethodManager? =
+        activity.getSystemService(Activity.INPUT_METHOD_SERVICE) as? InputMethodManager
+
+    private fun hideIme() {
+        imeShown = false
+        imm()?.hideSoftInputFromWindow(input.windowToken, 0)
     }
 
     // ---------------------------------------------------------------- 打开
@@ -90,16 +140,21 @@ class FavFolderPanel(
         heading.setText(R.string.fav_folder_new_title)
         createBox.visibility = View.VISIBLE
         delBox.visibility = View.GONE
-        keypad.clear()
-        paintInput("")
-        keypad.ensureBuilt()
-        keysBox.post { keypad.focusFirst() }
+        input.setText("")
+        // 进来就把键盘带出来：这一页唯一要做的第一件事就是打夹名
+        input.post {
+            input.requestFocus()
+            imeShown = true
+            imm()?.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
+        }
         Diag.enter("新建收藏夹")
     }
 
     /** 删除收藏夹 */
     fun showDelete() {
         pendingId = 0L
+        // 从「新建」切过来时键盘可能还开着，这一档没有输入框，得收掉
+        hideIme()
         panel.visibility = View.VISIBLE
         heading.setText(R.string.fav_folder_del_title)
         createBox.visibility = View.GONE
@@ -110,8 +165,8 @@ class FavFolderPanel(
     }
 
     fun dismiss() {
-        // 字母卡是叠在键盘上的独立一层，面板 GONE 不会带走它——留着下次打开就冒出来
-        keypad.dismissPicker()
+        // 面板 GONE 不会收掉系统键盘，它会孤零零留在屏幕上
+        hideIme()
         panel.visibility = View.GONE
         pendingId = 0L
     }
@@ -129,71 +184,49 @@ class FavFolderPanel(
     /**
      * 返回键归这一层管：面板开着的时候返回是「关面板」，不是「退出应用」
      *
-     * 方向键在键盘里也归这一层管：Keypad 有自己的算术导航，
-     * 键宽不等（空格、确定是宽键），交给 FocusFinder 的几何搜索会在字母之间乱跳。
+     * 输入框里那几颗方向键也归这一层：单行 EditText 会把 ↑↓ 当成光标移动吃掉，
+     * 遥控器一路按到屏幕底也出不了输入框。
      */
     fun handleKey(code: Int): Boolean {
         if (!isShowing) return false
         if (code == KeyEvent.KEYCODE_BACK) {
-            // 字母卡开着：先收卡片，再按一次才关面板——一次返回只退一层
-            if (keypad.dismissPicker()) return true
+            // 键盘开着：先收键盘（焦点交给「确定」），再按一次才关面板——一次返回只退一层
+            if (imeShown) {
+                okBtn.requestFocus()
+                hideIme()
+                return true
+            }
             dismissAndReturnFocus()
             return true
         }
-        // 「确定 / 取消」往上：回键盘。
-        // 不显式接管的话，FocusFinder 的几何搜索会落到第三行末尾——
-        // 那正好是键盘上的「确定」键，用户按一下就把名字提交了。
+        // 删除模式里没有输入框，方向键全归列表
+        if (createBox.visibility != View.VISIBLE) return false
+        if (activity.currentFocus === input) {
+            when (code) {
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    okBtn.requestFocus()
+                    return true
+                }
+                // 输入框上面是那一行标题，没有可聚焦的东西：吃掉，
+                // 放行的话焦点会跑到浮层背后的首页去
+                KeyEvent.KEYCODE_DPAD_UP -> return true
+            }
+            return false
+        }
+        // 「确定 / 取消」往上回输入框
         if (code == KeyEvent.KEYCODE_DPAD_UP &&
             (activity.currentFocus === okBtn || activity.currentFocus === cancelBtn)
         ) {
-            keypad.focusLastRowStart()
+            input.requestFocus()
             return true
         }
-        // 焦点不在键盘上就别抢方向键：删除模式的列表还要自己上下翻
-        if (!keypad.contains(activity.currentFocus)) return false
-        return when (code) {
-            KeyEvent.KEYCODE_DPAD_LEFT,
-            KeyEvent.KEYCODE_DPAD_RIGHT,
-            KeyEvent.KEYCODE_DPAD_UP,
-            KeyEvent.KEYCODE_DPAD_DOWN,
-            -> {
-                val moved = keypad.move(code)
-                if (moved) return true
-                when (code) {
-                    // 键盘最后一行再往下：到底部的「确定 / 取消」
-                    KeyEvent.KEYCODE_DPAD_DOWN -> {
-                        okBtn.requestFocus()
-                        true
-                    }
-                    // 顶行再往上：键盘上面只有只读的回显，没有可聚焦的东西。
-                    // 一定要吃掉这个键——放行的话事件会穿透到 Activity 的默认分发，
-                    // FocusFinder 把焦点拽到浮层背后的侧栏去，
-                    // 用户在键盘里按上键，焦点却跑到了完全看不见的地方。
-                    KeyEvent.KEYCODE_DPAD_UP -> true
-                    // 最右一列再往右同理：浮层里右边没有东西，吃掉；
-                    // 放行同样是穿透到背后的首页
-                    KeyEvent.KEYCODE_DPAD_RIGHT -> true
-                    else -> false
-                }
-            }
-            else -> false
-        }
+        return false
     }
 
     // ---------------------------------------------------------------- 新建
 
-    private fun paintInput(text: String) {
-        if (text.isEmpty()) {
-            input.text = activity.getString(R.string.fav_folder_hint)
-            input.setTextColor(activity.getColor(R.color.text_secondary))
-        } else {
-            input.text = text
-            input.setTextColor(activity.getColor(R.color.text_primary))
-        }
-    }
-
     private fun submitCreate() {
-        val name = keypad.text.trim()
+        val name = input.text?.toString().orEmpty().trim()
         if (name.isEmpty()) {
             hint(activity.getString(R.string.fav_folder_hint))
             return

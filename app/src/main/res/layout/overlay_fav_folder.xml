@@ -2,8 +2,9 @@
 <!-- 收藏夹管理。两个模式共用一页：
      「新建收藏夹」是输入，「删除收藏夹」是挑一个夹子删掉。
 
-     新建靠自绘键盘，不用系统输入法：这台机器的系统 IME 被裁得只剩框架，
-     弹出来也不会响应方向键。键只有 a-z，B 站的收藏夹名本来就常是英文单词。 -->
+     输入走电视自带的输入法（这台机器是搜狗 TV 版），能直接打中文夹名。
+     早先这里是自绘九宫格，只能敲 a-z；明明有词库却让人一个字母一个字母拼，
+     是把难走的那条默认成了唯一能走的那条。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/fav_folder_panel"
     android:layout_width="match_parent"
@@ -39,30 +40,23 @@
         android:gravity="center_horizontal"
         android:orientation="vertical">
 
-        <TextView
+        <!-- 输入框就是输入法窗口的宿主，居中显示夹名 -->
+        <com.kunplayer.tv.ui.ImeEditText
             android:id="@+id/fav_folder_input"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:ellipsize="end"
-            android:fontFamily="sans-serif-medium"
+            android:layout_height="48dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_chip"
             android:gravity="center"
+            android:hint="@string/fav_folder_hint"
+            android:imeOptions="actionDone"
+            android:inputType="text"
             android:maxLines="1"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
             android:textColor="@color/text_primary"
-            android:textSize="26sp" />
-
-        <!-- 外面这层是给「按一格弹字母」的卡片留的叠层位置，原因同 panel_search -->
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp">
-
-            <LinearLayout
-                android:id="@+id/fav_folder_keys"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
-        </FrameLayout>
+            android:textColorHint="@color/text_secondary"
+            android:textSize="18sp" />
 
         <LinearLayout
             android:layout_width="wrap_content"
