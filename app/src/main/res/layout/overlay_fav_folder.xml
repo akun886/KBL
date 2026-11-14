@@ -99,7 +99,7 @@
                 android:paddingStart="34dp"
                 android:paddingEnd="34dp"
                 android:text="@string/fav_folder_cancel"
-                android:textColor="@color/text_primary"
+                android:textColor="@color/pill_text"
                 android:textSize="16sp" />
         </LinearLayout>
     </LinearLayout>
@@ -145,7 +145,7 @@
             android:paddingStart="34dp"
             android:paddingEnd="34dp"
             android:text="@string/fav_folder_cancel"
-            android:textColor="@color/text_primary"
+            android:textColor="@color/pill_text"
             android:textSize="16sp" />
     </LinearLayout>
 </LinearLayout>

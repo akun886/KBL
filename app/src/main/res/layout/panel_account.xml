@@ -761,7 +761,7 @@
                 android:paddingEnd="24dp"
                 android:paddingBottom="9dp"
                 android:text="@string/account_switch"
-                android:textColor="@color/text_primary"
+                android:textColor="@color/pill_text"
                 android:textSize="16sp"
                 android:visibility="gone" />
 
