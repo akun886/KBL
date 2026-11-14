@@ -435,11 +435,11 @@
                     android:textSize="15sp" />
 
                 <!-- 「正在收听」聚焦态的大频谱。焦点落到左边的封面（这一首的入口）时，
-                     歌名收起、歌手那一行让位，它占住歌名原来的那一条：高度按歌名的实际
-                     高度在代码里定（HomeStage.applyBarBigMode），左沿是歌名原来的起点
-                     （封面右边 14dp），右沿到「上一首」之前。平时 gone，不占位。
-                     放在歌名之后、歌手行之前，是为了进聚焦态时它顶在歌名原位、整块高度
-                     又和常态一致（歌手行改 INVISIBLE 保留占位），底栏的垂直居中不挪。 -->
+                     歌名与歌手两格都收起，整块换给它：高度按「歌名行 + 间距 + 歌手行」
+                     的真实总高在代码里定（HomeStage.applyBarBigMode），柱子从整块底边往上长，
+                     两格都占满，不留空白格。左沿是文字块起点（封面右边 14dp），
+                     右沿到「上一首」之前。平时 gone，不占位。
+                     聚焦态时文字块只剩它一个可见子项，高度与常态一致，垂直居中不挪。 -->
                 <com.kunplayer.tv.ui.SpectrumView
                     android:id="@+id/home_bar_spectrum_big"
                     android:layout_width="match_parent"

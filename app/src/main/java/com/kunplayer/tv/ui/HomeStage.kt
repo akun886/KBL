@@ -269,8 +269,15 @@ class HomeStage(
      */
     private var barBig = false
 
-    /** 歌名那一行的实际高度（px）。大频谱的高度按它来，量不到就给 24dp 兜底 */
+    /** 歌名那一行的实际高度（px），常态下量一次 */
     private var titleBandH = 0
+
+    /**
+     * 文字块（歌名行 + 间距 + 歌手行）的实际总高（px），常态下量一次。
+     * 聚焦态的大频谱按它定高，才能把两格一起占满——只按歌名行高的话，
+     * 歌手行那格会空出来，柱子又贴着自己那一格的底边，看着像只占了下格。
+     */
+    private var barTextH = 0
 
     val isShowing: Boolean get() = root.visibility == View.VISIBLE
 
@@ -347,6 +354,9 @@ class HomeStage(
         // 跑马灯只在 selected 状态下滚。TextView 默认不可聚焦时不会自己选中，
         // 于是歌词会静静停在那里、超长部分直接被裁掉——「滚动显示」就没了
         barLyric.isSelected = true
+        // 底栏这条是宽扁带（宽上千像素、高只有两格文字），环形要方地、波形摊开是一道糊。
+        // 无论设置里选了哪种样式，这里一律画柱状
+        barBigSpectrum.alwaysBars = true
 
         // 歌词 / 频谱切换格：确认轮换，左右也轮换。它不进底栏那排横向键的链子，
         // 从歌名按下来才进得去、按上回歌名——老路径一格都不多走
@@ -356,9 +366,16 @@ class HomeStage(
             updateBarNowPlayingMode()
         }
         bar.viewTreeObserver.addOnGlobalLayoutListener {
-            sizeBarSpectrum()
-            // 常态下记一次歌名那一行的真实高度：进聚焦态时按它给大频谱定高
-            if (!barBig && barTitle.height > 0) titleBandH = barTitle.height
+            if (!barBig) {
+                sizeBarSpectrum()
+                // 常态下量一次两格的总高：歌名行 + 歌手行的上间距 + 歌手行，
+                // 全按真实布局尺寸算，以后改字号或行高不用回来改常量
+                if (barTitle.height > 0) {
+                    titleBandH = barTitle.height
+                    val rowLp = barArtistRow.layoutParams as? LinearLayout.LayoutParams
+                    barTextH = barTitle.height + barArtistRow.height + (rowLp?.topMargin ?: 0)
+                }
+            }
         }
 
         paintPaneHint()
@@ -992,24 +1009,30 @@ class HomeStage(
     }
 
     /**
-     * 大频谱态：歌名、歌手/歌词/频谱那一行收起，整块让给一条频谱。
-     * 高度对齐歌名那一行（量它的真实高度），左沿是歌名原来的起点（封面之后），
-     * 右沿到「上一首」之前——所以它比常态那条小频谱更宽，也更醒目。
+     * 大频谱态：歌名与歌手两格一起收起，整块让给一条频谱。
+     * 高度取两格的真实总高（[barTextH]），柱子从整块底边往上长，两格都占满；
+     * 左沿是文字块起点（封面之后），右沿到「上一首」之前。
+     *
+     * 两格都 GONE 而不是留一个 INVISIBLE 占位：聚焦态文字块只剩频谱一个子项，
+     * 它的高度就是两格总高，与常态一致，底栏的垂直居中不挪，也不会剩半格空白。
      */
     private fun applyBarBigMode() {
         if (barBig) {
-            val h = barTitle.height.takeIf { it > 0 }
-                ?: titleBandH.takeIf { it > 0 }
-                ?: (24 * activity.resources.displayMetrics.density).toInt()
+            val density = activity.resources.displayMetrics.density
+            val h = barTextH.takeIf { it > 0 }
+                ?: if (titleBandH > 0) {
+                    // 还没量到总高：歌名行 + 3dp 间距 + 16dp 歌手行
+                    titleBandH + (19 * density).toInt()
+                } else {
+                    (43 * density).toInt()
+                }
             val lp = barBigSpectrum.layoutParams
             if (lp.height != h) {
                 lp.height = h
                 barBigSpectrum.layoutParams = lp
             }
             barTitle.visibility = View.GONE
-            // 歌手行用 INVISIBLE 而不是 GONE：留着它那 16dp 的占位，整块高度就和常态
-            // 一模一样，底栏的垂直居中不挪动，大频谱正好顶在歌名原来那一条上
-            barArtistRow.visibility = View.INVISIBLE
+            barArtistRow.visibility = View.GONE
             barSpectrum.visibility = View.GONE
             barLyric.visibility = View.GONE
             barBigSpectrum.visibility = if (playback.hasTrack()) View.VISIBLE else View.GONE
