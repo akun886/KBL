@@ -56,19 +56,6 @@ class SpectrumView @JvmOverloads constructor(
             invalidate()
         }
 
-    /**
-     * 宽扁带专用：无论设置里选了哪种样式，都只画柱状。
-     * 高度一旦超过 28dp，[onDraw] 的 narrow 判断就放行，波形会摊成一道糊、
-     * 环形更是只剩中间一个圈——上千像素宽、几十像素高的带子撑不起这两种。
-     * 底栏那条占满两格的大频谱就用它，播放页的方图和列表行的 MINI 不受影响。
-     */
-    var alwaysBars = false
-        set(value) {
-            field = value
-            // 赋值即生效：视图可能早就 attach 过了，不能等下一次 onAttachedToWindow
-            if (value) mode = Mode.BARS
-        }
-
     /** 暂停时迷你频谱停手：一首没在响的歌旁边跳着柱子，是在骗人 */
     var playing: Boolean = false
         set(value) {
@@ -146,9 +133,7 @@ class SpectrumView @JvmOverloads constructor(
         super.onAttachedToWindow()
         // 颜色是全局设置，每次上屏都取一次：改完设置不必重建整棵视图树
         tint = Settings.color(context)
-        if (alwaysBars) {
-            mode = Mode.BARS
-        } else if (mode != Mode.MINI) {
+        if (mode != Mode.MINI) {
             mode = when (Settings.style(context)) {
                 Settings.STYLE_WAVE -> Mode.WAVE
                 Settings.STYLE_RING -> Mode.RING
@@ -171,9 +156,7 @@ class SpectrumView @JvmOverloads constructor(
     /** 设置改过之后重取一次样式与颜色。大图与小图都走这里 */
     fun applySettings() {
         tint = Settings.color(context)
-        if (alwaysBars) {
-            mode = Mode.BARS
-        } else if (mode != Mode.MINI) {
+        if (mode != Mode.MINI) {
             mode = when (Settings.style(context)) {
                 Settings.STYLE_WAVE -> Mode.WAVE
                 Settings.STYLE_RING -> Mode.RING

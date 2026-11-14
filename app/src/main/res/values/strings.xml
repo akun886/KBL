@@ -57,6 +57,7 @@
     <string name="bar_no_lyrics">这首歌没有歌词</string>
     <string name="bar_pane_lyrics">歌词</string>
     <string name="bar_pane_spectrum">频谱</string>
+    <string name="bar_pane_immersive">沉浸频谱</string>
 
     <string name="fav_empty">还没有收藏。在歌曲上按 MENU 键收藏</string>
     <string name="fav_added">已加入收藏</string>

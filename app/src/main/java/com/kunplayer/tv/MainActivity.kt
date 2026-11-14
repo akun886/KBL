@@ -394,8 +394,8 @@ class MainActivity : Activity() {
             home.show(focusPlaying = false, focusSidebar = false)
             spacePanel.focusBack()
         } else {
-            // 从播放页退回来：焦点落在底栏「正在收听」上（还在播的那首的封面），
-            // 在那儿展开一条大频谱，比把眼睛扔进三十行列表里更接得上刚才那一眼
+            // 从播放页退回来：焦点落在「还在播的那首」的封面上，比把眼睛扔进
+            // 三十行列表里更接得上刚才那一眼。只落焦点，不改底栏档位
             home.show(focusOnNowPlaying = true)
         }
     }

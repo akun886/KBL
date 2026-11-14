@@ -434,18 +434,6 @@
                     android:textColor="@color/text_primary"
                     android:textSize="15sp" />
 
-                <!-- 「正在收听」聚焦态的大频谱。焦点落到左边的封面（这一首的入口）时，
-                     歌名与歌手两格都收起，整块换给它：高度按「歌名行 + 间距 + 歌手行」
-                     的真实总高在代码里定（HomeStage.applyBarBigMode），柱子从整块底边往上长，
-                     两格都占满，不留空白格。左沿是文字块起点（封面右边 14dp），
-                     右沿到「上一首」之前。平时 gone，不占位。
-                     聚焦态时文字块只剩它一个可见子项，高度与常态一致，垂直居中不挪。 -->
-                <com.kunplayer.tv.ui.SpectrumView
-                    android:id="@+id/home_bar_spectrum_big"
-                    android:layout_width="match_parent"
-                    android:layout_height="14dp"
-                    android:visibility="gone" />
-
                 <!-- 歌手 / 歌词 / 频谱共用一行。
                      歌词从歌手后面空两个字符开始滚动——两个字的距离是「这句话换了一个人说的」
                      的停顿，紧贴着歌手会读成「歌手长这样」。
@@ -506,6 +494,16 @@
                             android:layout_width="match_parent"
                             android:layout_height="14dp"
                             android:layout_gravity="center"
+                            android:visibility="gone" />
+
+                        <!-- 沉浸档的大频谱。放在切换格内部而不是文字块里，是为了让切换格
+                             三档都常驻、都能聚焦：进沉浸档时只把这一格撑到两格高，
+                             歌名与歌手收起，柱子从整块底边往上长，两格都占满。
+                             平时 gone，不占位；歌名行的焦点链因此一格都不用改。 -->
+                        <com.kunplayer.tv.ui.SpectrumView
+                            android:id="@+id/home_bar_spectrum_big"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
                             android:visibility="gone" />
                     </FrameLayout>
                 </LinearLayout>

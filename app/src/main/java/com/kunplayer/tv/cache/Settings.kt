@@ -53,6 +53,9 @@ object Settings {
     @Volatile
     private var bgPlayCache = -1
 
+    @Volatile
+    private var barPaneCache = Int.MIN_VALUE
+
     private fun pref(c: Context) = c.getSharedPreferences(PREF, Context.MODE_PRIVATE)
 
     fun style(c: Context): Int {
@@ -124,5 +127,26 @@ object Settings {
     fun setBackgroundPlay(c: Context, on: Boolean) {
         bgPlayCache = if (on) 1 else 0
         pref(c).edit().putBoolean("background_play", on).apply()
+    }
+
+    /**
+     * 首页底栏那一格显示什么。三档：歌词 / 小频谱 / 沉浸（占满两格的大频谱）。
+     *
+     * 存的是「用户显式选的那一档」，-1 表示自动档：有词给词、没词给频谱。
+     * 和播放页的 `userPicked` 同理——跨页面、跨进程都该停在上次选的那档，
+     * 不能因为进了一次播放页就被打回自动档。
+     */
+    fun barPane(c: Context): Int {
+        val cached = barPaneCache
+        if (cached != Int.MIN_VALUE) return cached
+        val v = pref(c).getInt("bar_pane", -1).coerceIn(-1, 2)
+        barPaneCache = v
+        return v
+    }
+
+    fun setBarPane(c: Context, value: Int) {
+        val v = value.coerceIn(-1, 2)
+        barPaneCache = v
+        pref(c).edit().putInt("bar_pane", v).apply()
     }
 }
