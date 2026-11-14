@@ -265,7 +265,7 @@ QQ 音乐 TV 版的双栏。
 叠放顺序必须与 `activity_main.xml` 里 include 的**反序**一致：
 
 ```
-overlay_login > overlay_following > overlay_fav_folder > panel_account
+overlay_login > overlay_accounts > overlay_following > overlay_fav_folder > panel_account
 > panel_search > overlay_now(播放页) > overlay_space(作者主页) > home_stage
 ```
 
@@ -535,6 +535,24 @@ overlay_login > overlay_following > overlay_fav_folder > panel_account
 - **焦点链手工接**：侧栏首项按右到第一个词；词内方向键按行列算（行尾 → 下一行行首、
   上下按横向距离就近），出流才交接——第一行 ↑ 回侧栏，最后一行 ↓ 到「播放全部」。
   「播放全部」↑ 回到 `chipFocus`（刚才离开的那一颗），不横穿到侧栏。
+
+## 登录与账号切换（0.32.0）
+
+- **「切换账号」不是「退出再登」。** `AccountStore`（SharedPreferences `accounts`）按 mid 存每个登录过的
+  账号的鉴权 Cookie，切换时整套写回 `CookieStore`（`LoginApi.adopt`，**先清后写**——上一个账号有、
+  这个账号没有的字段留着，服务端看到的是「A 的门票 + B 的会话」）。让用户为换个人再扫一次码，
+  是最容易被骂成「切换等于重新登录」的做法。
+- **`buvid3/buvid4` 不进账号档案。** 那是设备指纹，跟机器走不跟人走。每个账号存一份等于让同一台
+  电视在服务端看来是好几台设备，而这正是风控最敏感的信号。
+- **每次拿到 nav 都 `remember` 一遍**，昵称、头像、会员身份随之更新（到期那天就是这么落到列表里的）。
+  nav 说没登录（`isLogin=false`）时删掉这条死档案，别留一行点不动的账号。
+- **「退出登录」会连档案一起删**（`AccountStore.forget`）。这是隐私决定，不是漏写：只清 Cookie 留档案，
+  谁在客厅按一下都能不经任何验证回到这个账号。换人用「切换账号」，那条路谁都不会丢。
+- **账号行的字色必须由行的焦点监听器直接改，不能用 `duplicateParentState` + color selector。**
+  那个属性只跟**直接父级**联动，而昵称和身份在列容器里隔了一层、容器自己不是焦点宿主，
+  状态传不下去——聚焦那行翻白底，字还是白的，昵称整块看不见（0.32.0 第一次真机就是这样）。
+- **面板自己管方向键，越界吃掉**；返回时焦点回「切换账号」那颗钮。从面板点「扫码登录新账号」
+  进去的，返回要先回面板（`loginFromSwitch`），不是甩回「我的」页——一次返回只退一层。
 
 ## 数据源
 

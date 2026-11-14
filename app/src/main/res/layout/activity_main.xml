@@ -28,6 +28,11 @@
 
     <include layout="@layout/overlay_following" />
 
+    <!-- 切换账号：列登录过的账号，选中即换，最后一行才是扫码。
+         它从设置页「我的」弹出，压在扫码浮层**下面**——那条路是「先关列表再开扫码」，
+         但万一两者同时在，看得见的那层必须是二维码。 -->
+    <include layout="@layout/overlay_accounts" />
+
     <include layout="@layout/overlay_login" />
 
     <TextView

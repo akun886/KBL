@@ -116,6 +116,10 @@
     <string name="account_login">扫码登录</string>
     <string name="account_logout">退出登录</string>
     <string name="account_switch">切换账号</string>
+    <string name="account_switch_scan">扫码登录新账号</string>
+    <string name="account_switch_current">当前</string>
+    <string name="account_switched">已切换到 %1$s</string>
+    <string name="account_expired">登录已失效，请重新扫码</string>
     <string name="account_logged_sub">收藏与播放历史已与 App 同步</string>
     <string name="account_vip_normal">普通用户</string>
     <string name="account_vip_member">大会员</string>

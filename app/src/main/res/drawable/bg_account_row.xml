@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 账号列表的一行。聚焦整行翻白，和筛选词胶囊、「退出登录」同一套说法：
+     电视上「选中」就是这块地方亮了，不做描边、不做角标。
+     行内两行文字靠 duplicateParentState 继承这一行的焦点状态（见 color/account_row_*） -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="12dp" />
+            <solid android:color="#FFFFFFFF" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="12dp" />
+            <solid android:color="#0DFFFFFF" />
+        </shape>
+    </item>
+</selector>

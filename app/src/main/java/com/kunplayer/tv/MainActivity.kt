@@ -22,7 +22,9 @@ import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.kunplayer.tv.audio.AudioBus
+import com.kunplayer.tv.cache.AccountStore
 import com.kunplayer.tv.cache.Resume
+import com.kunplayer.tv.cache.SavedAccount
 import com.kunplayer.tv.cache.SearchHistory
 import com.kunplayer.tv.cache.Settings
 import com.kunplayer.tv.diag.Crash
@@ -34,6 +36,7 @@ import com.kunplayer.tv.net.LoginApi
 import com.kunplayer.tv.net.SearchApi
 import com.kunplayer.tv.player.PlaybackController
 import com.kunplayer.tv.player.QueueMode
+import com.kunplayer.tv.ui.AccountSwitchPanel
 import com.kunplayer.tv.ui.ColorPalette
 import com.kunplayer.tv.ui.CoverLoader
 import com.kunplayer.tv.ui.FavFolderPanel
@@ -180,6 +183,12 @@ class MainActivity : Activity() {
     private lateinit var colorPalette: ColorPalette
 
     private lateinit var login: QrLogin
+
+    /** 切换账号：列登录过的账号，选中即换（不登出上一个，见 AccountStore） */
+    private lateinit var switchPanel: AccountSwitchPanel
+
+    /** 扫码浮层是不是从账号面板里点出来的。决定放弃扫码时退回哪一层 */
+    private var loginFromSwitch = false
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val ui = Handler(Looper.getMainLooper())
@@ -407,6 +416,28 @@ class MainActivity : Activity() {
             log = ::log,
         )
 
+        switchPanel = AccountSwitchPanel(
+            activity = this,
+            onPick = { acc ->
+                // 先关面板再换：换账号会立刻重画「我的」页，
+                // 面板还挂着的话，用户看到的是一张盖在结果上的旧列表
+                switchPanel.dismiss()
+                adoptAccount(acc)
+            },
+            onScanNew = {
+                // 记住这一趟是从面板出来的：扫码放弃时该回面板，不是回「我的」页
+                loginFromSwitch = true
+                switchPanel.dismiss()
+                login.show()
+            },
+            // 关掉就回「切换账号」那颗钮：它是这次进来的入口，「返回只退一层」
+            onClosed = {
+                if (accountPanel.visibility == View.VISIBLE) {
+                    accountSwitch.post { accountSwitch.requestFocus() }
+                }
+            },
+        )
+
         home = HomeStage(
             activity = this,
             playback = PlaybackController.get(this),
@@ -545,6 +576,13 @@ class MainActivity : Activity() {
         if (login.isShowing) {
             if (code == KeyEvent.KEYCODE_BACK) {
                 login.dismiss()
+                // 从账号面板里点「扫码登录新账号」进来的：返回退回那张面板，
+                // 而不是甩回「我的」页——一次返回只退一层，退完还站在原地
+                if (loginFromSwitch) {
+                    loginFromSwitch = false
+                    openSwitch()
+                    return true
+                }
                 // 登录是从设置页「我的」按出来的：设置页还开着就把焦点还给它，
                 // 别把光标扔到首页侧栏（那看起来像设置页已经关了）
                 if (accountPanel.visibility == View.VISIBLE) {
@@ -556,6 +594,9 @@ class MainActivity : Activity() {
             }
             return false
         }
+        // 切换到账号列表：它压在设置页上面（从「我的」弹出），按键先归它。
+        // 不接返回就是焦点悬空——列表随面板 GONE，之后每个键都像按在空处
+        if (switchPanel.isShowing) return switchPanel.handleKey(code)
         // 这三层浮层各自接管返回键：浮层里的控件随浮层一起 GONE，
         // 不接返回就等于焦点悬空，之后所有按键都失灵
         if (followingPanel.isShowing) return followingPanel.handleKey(code)
@@ -1195,7 +1236,7 @@ class MainActivity : Activity() {
                 .start()
         }
         accountBtn.setOnClickListener { onAccountAction() }
-        accountSwitch.setOnClickListener { switchAccount() }
+        accountSwitch.setOnClickListener { openSwitch() }
     }
 
     /**
@@ -1815,6 +1856,10 @@ class MainActivity : Activity() {
             login.show()
             return
         }
+        // 退出是「这个账号不在这台机器上留了」：Cookie 与档案一起删。
+        // 只删 Cookie 留档案的话，谁来客厅按一下都能直接回到我的账号，中间没有任何验证。
+        // 「换个人用」走「切换账号」，那条路谁都不会丢，随时能切回来
+        AccountStore.forget(LoginApi.mid())
         LoginApi.logout()
         accountUser = ""
         accountFaceUrl = ""
@@ -1826,24 +1871,55 @@ class MainActivity : Activity() {
     }
 
     /**
-     * 切换账号：先退掉当前这个，再直接弹扫码。
+     * 切换账号：列出登录过的账号，选中即换；最后一行才是扫码加一个新账号。
      *
-     * 不做「多账号列表」：B 站这套 Cookie 是单会话的（一个 buvid + 一个 SESSDATA），
-     * 存两份就要自己管切换时的收藏/历史串号问题，而这个应用只有一个人用。
-     * 换人 = 退出 + 重扫，一步不少，但每一步都是用户看得懂的动作。
+     * 这条路**不登出**当前账号——退掉再让用户重扫一遍，是最容易被人骂成
+     * 「切换等于重新登录」的做法。每个账号的鉴权 Cookie 各自存在 [AccountStore]，
+     * 换人就是把那一套换上来（[LoginApi.adopt] 先清后写，避免两套 Cookie 拼在一起）。
      */
-    private fun switchAccount() {
-        LoginApi.logout()
-        accountUser = ""
-        accountFaceUrl = ""
-        accountVip = ""
+    private fun openSwitch() {
+        if (!LoginApi.isLoggedIn() && AccountStore.all().isEmpty()) {
+            // 这台机器上从来没有过登录态：切换和登录是同一件事，不用多一层列表
+            login.show()
+            return
+        }
+        // 当前这套 Cookie 还没入档（这个版本之前登录的、或登录后没拉到 nav）：
+        // 先补一条，否则面板里只剩「扫码登录新账号」，看着像「你已经被登出了」
+        if (LoginApi.isLoggedIn()) {
+            val mid = LoginApi.mid()
+            if (AccountStore.all().none { it.mid == mid }) {
+                AccountStore.remember(mid, accountUser, accountFaceUrl, accountVip)
+            }
+        }
+        switchPanel.show(AccountStore.all(), LoginApi.mid())
+        Diag.enter("切换账号")
+    }
+
+    /** 换成档案里的这个账号 */
+    private fun adoptAccount(acc: SavedAccount) {
+        if (LoginApi.isLoggedIn() && acc.mid == LoginApi.mid()) {
+            // 选的就是当前这个：不重换 Cookie（心跳、播放队列都还连着），
+            // 只把它挪到列表最前，下次打开就在顶上
+            AccountStore.touch(acc)
+            hint(getString(R.string.account_switched, acc.uname), autoHide = true)
+            return
+        }
+        LoginApi.adopt(acc.cookies)
+        accountUser = acc.uname
+        accountFaceUrl = acc.face
+        accountVip = acc.vip
         home.invalidate()
         paintAccount()
-        log("切换账号：已退出旧账号，等待扫码")
-        login.show()
+        AccountStore.touch(acc)
+        hint(getString(R.string.account_switched, acc.uname), autoHide = true)
+        log("切换账号：${acc.uname}（mid ${acc.mid}）")
+        // Cookie 存着不代表服务端还认（久不用的号会被下线、改密码会踢掉会话）：
+        // 复核仍交给 nav，它在失败时会把这条失效档案清掉
+        refreshAccountName()
     }
 
     private fun onLoggedIn(uname: String) {
+        loginFromSwitch = false
         accountUser = uname
         home.invalidate()
         paintAccount()
@@ -1870,15 +1946,22 @@ class MainActivity : Activity() {
                 accountUser = nav.uname
                 accountFaceUrl = nav.face
                 accountVip = vipTextOf(nav)
+                // 每一次拿到 nav 都顺手更新档案：昵称、头像、会员身份都会变
+                // （到期那天就是这么落到列表里的，不用等用户下次登录）
+                AccountStore.remember(nav.mid, nav.uname, nav.face, accountVip)
                 paintAccount()
             } else {
                 // Cookie 在但服务端不认（过期/被踢）：按未登录处理，别让用户对着一个假登录态
+                val dead = LoginApi.mid()
                 LoginApi.logout()
                 accountUser = ""
                 accountFaceUrl = ""
                 accountVip = ""
                 home.invalidate()
                 paintAccount()
+                // 这套 Cookie 已经作废，档案留着只会在列表里多一行点不动的账号
+                AccountStore.forget(dead)
+                hint(getString(R.string.account_expired), autoHide = true)
             }
         }
     }

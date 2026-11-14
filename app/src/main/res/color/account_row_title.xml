@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 账号行主文字。bg_account_row 聚焦翻白，字不跟着翻就是白底白字。
+     行本身是焦点宿主，行内 TextView 要靠 android:duplicateParentState="true"
+     才能继承到这个状态——漏了那条属性，效果就是「字一直是白的」。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true" android:color="#FF0A0A0A" />
+    <item android:color="@color/text_primary" />
+</selector>

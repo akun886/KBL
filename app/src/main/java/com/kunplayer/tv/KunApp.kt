@@ -2,6 +2,7 @@ package com.kunplayer.tv
 
 import android.app.Application
 import com.kunplayer.tv.audio.AudioBus
+import com.kunplayer.tv.cache.AccountStore
 import com.kunplayer.tv.cache.Resume
 import com.kunplayer.tv.cache.Settings
 import com.kunplayer.tv.diag.Crash
@@ -20,6 +21,8 @@ class KunApp : Application() {
         Diag.init(this)
         // 两者都必须早于任何网络调用：Cookie 决定 buvid 是否复用，缓存目录决定封面是否命中
         CookieStore.init(this)
+        // 登录过的账号档案：切账号时整套 Cookie 从这儿换
+        AccountStore.init(this)
         BiliHttp.init(cacheDir)
         // 歌词缓存要自己的目录：它是解析后的文本，和 OkHttp 的响应缓存不是一回事
         LyricsApi.init(filesDir)

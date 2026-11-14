@@ -29,9 +29,32 @@ object LoginApi {
     const val WAIT_CONFIRM = 86090
     const val EXPIRED = 86038
 
-    private val authCookies = listOf("SESSDATA", "bili_jct", "DedeUserID", "DedeUserID__ckMd5", "sid")
+    /**
+     * 一个登录态由这几个 Cookie 组成：SESSDATA 是门票，bili_jct 是写接口的 CSRF，
+     * DedeUserID 认人。切账号时要整套换，少一个就会出现「人换了、收藏还是上一个人的」。
+     */
+    val AUTH_COOKIES = listOf("SESSDATA", "bili_jct", "DedeUserID", "DedeUserID__ckMd5", "sid")
 
     fun isLoggedIn(): Boolean = !CookieStore.get("SESSDATA").isNullOrEmpty()
+
+    /** 当前这套鉴权 Cookie 的快照，用来存账号档案 */
+    fun snapshot(): Map<String, String> = AUTH_COOKIES
+        .mapNotNull { name -> CookieStore.get(name)?.takeIf { it.isNotEmpty() }?.let { name to it } }
+        .toMap()
+
+    /**
+     * 换上一套存下来的 Cookie。
+     *
+     * 先清后写，不能只覆盖：上一个账号可能有这个账号没有的字段（比如 sid），
+     * 留着的话服务端看到的是「A 的门票 + B 的会话」，轻则收藏串号，重则直接不认。
+     */
+    fun adopt(cookies: Map<String, String>): Boolean {
+        AUTH_COOKIES.forEach { CookieStore.remove(it) }
+        cookies.forEach { (name, value) ->
+            if (name in AUTH_COOKIES && value.isNotEmpty()) CookieStore.put(name, value)
+        }
+        return isLoggedIn()
+    }
 
     fun mid(): Long = CookieStore.get("DedeUserID")?.toLongOrNull() ?: 0L
 
@@ -77,7 +100,7 @@ object LoginApi {
         val found = LinkedHashSet<String>()
 
         // 第一条路：crossDomain 跳转链的 query
-        for (name in authCookies) {
+        for (name in AUTH_COOKIES) {
             val value = rawQueryParam(crossDomainUrl, name)
             if (!value.isNullOrEmpty()) {
                 CookieStore.put(name, value)
@@ -92,7 +115,7 @@ object LoginApi {
             val name = pair.substringBefore('=', "")
             val value = pair.substringAfter('=', "")
             if (name.isEmpty() || value.isEmpty()) continue
-            if (name !in authCookies) continue
+            if (name !in AUTH_COOKIES) continue
             CookieStore.put(name, value)
             found += name
         }
@@ -115,6 +138,6 @@ object LoginApi {
      * 退出登录没有理由顺手把指纹也换了。
      */
     fun logout() {
-        authCookies.forEach { CookieStore.remove(it) }
+        AUTH_COOKIES.forEach { CookieStore.remove(it) }
     }
 }
