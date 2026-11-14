@@ -1184,9 +1184,9 @@ class HomeStage(
 
         val rowLp = barArtistRow.layoutParams as LinearLayout.LayoutParams
         rowLp.height = if (immersive) {
-            barTextH.takeIf { it > 0 } ?: (43 * density).toInt()
+            barTextH.takeIf { it > 0 } ?: ((BAR_TITLE_DP + BAR_ROW_H_DP + 3) * density).toInt()
         } else {
-            (16 * density).toInt()
+            (BAR_ROW_H_DP * density).toInt()
         }
         rowLp.topMargin = if (immersive) 0 else (3 * density).toInt()
         barArtistRow.layoutParams = rowLp
@@ -1332,14 +1332,19 @@ class HomeStage(
     /**
      * 设置里改过歌词的颜色 / 字体 / 大小：底栏那一行跟着换。
      *
-     * 字体这里只认字重，不换字族：底栏那一行只有 16dp 高、还带着跑马灯，
+     * 字体这里只认字重，不换字族：底栏那一行只有一行高、还带着跑马灯，
      * 宋体的字面比黑体高一截，换过去会顶到上面的歌名。播放页那一屏才换字族。
+     *
+     * 基准 16sp：12sp 在 3 米外读不出来（这一行还带着跑马灯，滚动中的字更糊）。
+     * **只放大、不缩小**（下限 1.0）：设置里的「小」是给播放页那种整段歌词用的，
+     * 底栏只有一行、本来就该一眼看清，跟着缩到 0.9 等于把字又调回去了。
+     * 上限 1.3——行高 24dp 刚好装得下 16×1.3，再大就压到上面的歌名。
      */
     private fun paintLyricStyle() {
         barLyric.setTextColor(Settings.lyricsColor(activity))
         barLyric.setTextSize(
             TypedValue.COMPLEX_UNIT_SP,
-            12f * Settings.lyricsScale(activity).coerceIn(0.85f, 1.15f),
+            16f * Settings.lyricsScale(activity).coerceIn(1f, 1.3f),
         )
     }
 
@@ -1876,5 +1881,18 @@ class HomeStage(
          * 有 FLAG_LONG_PRESS 的机器不会走到这里——那一支在 [heldDown] 里先命中。
          */
         const val HOLD_TO_BAR = 8
+
+        /**
+         * 底栏「歌手 / 歌词 / 频谱」那一行的高度（dp）。
+         *
+         * 原来是 16dp，只够 12sp 的字——3 米外看不清歌词。跟着歌词抬到 16sp 之后
+         * 这一行要 24dp 才装得下（还要容得下设置里「特大」档的 1.3 倍）。
+         * layout 里写一遍、`applyBarStructure` 切档时又要写回来，所以留成常量：
+         * 两处各写一个数字的话，切一次档就悄悄打回原值。
+         */
+        const val BAR_ROW_H_DP = 24
+
+        /** 常态歌名行实测高度（17sp + 上下各 2dp padding），只在 barTextH 还没量到时兜底 */
+        const val BAR_TITLE_DP = 27
     }
 }

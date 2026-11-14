@@ -52,7 +52,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="horizontal"
-        android:paddingBottom="62dp">
+        android:paddingBottom="72dp">
 
         <LinearLayout
             android:layout_width="200dp"
@@ -411,7 +411,7 @@
     <FrameLayout
         android:id="@+id/home_bar"
         android:layout_width="match_parent"
-        android:layout_height="62dp"
+        android:layout_height="72dp"
         android:layout_gravity="bottom"
         android:background="@drawable/bg_home_bar">
 
@@ -469,7 +469,7 @@
                     android:paddingEnd="8dp"
                     android:paddingBottom="2dp"
                     android:textColor="@color/text_primary"
-                    android:textSize="15sp" />
+                    android:textSize="17sp" />
 
                 <!-- 歌手 / 歌词 / 频谱共用一行。
                      歌词从歌手后面空两个字符开始滚动——两个字的距离是「这句话换了一个人说的」
@@ -480,7 +480,7 @@
                 <LinearLayout
                     android:id="@+id/home_bar_artist_row"
                     android:layout_width="match_parent"
-                    android:layout_height="16dp"
+                    android:layout_height="24dp"
                     android:layout_marginTop="3dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
@@ -520,7 +520,7 @@
                             android:marqueeRepeatLimit="marquee_forever"
                             android:singleLine="true"
                             android:textColor="@color/text_secondary"
-                            android:textSize="12sp" />
+                            android:textSize="16sp" />
 
                         <!-- match_parent 只是布局期占位。上屏后按「这一格左沿 → 上一首按钮左沿」
                              的真实坐标重算宽度（HomeStage.sizeBarSpectrum），右端到按钮前
