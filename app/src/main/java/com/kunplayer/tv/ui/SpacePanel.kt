@@ -202,10 +202,10 @@ class SpacePanel(
         followBtn.setBackgroundResource(
             if (followed) R.drawable.bg_pill_dark else R.drawable.bg_pill_play,
         )
-        // 字色必须跟着背景翻：
-        // 已关注是深色胶囊配白字，但胶囊一聚焦背景就翻成白色（bg_pill_dark 的
-        // focused 项），白字压在白底上——按钮上的字整个消失，只剩一个白块。
-        val onWhite = !followed || followBtn.hasFocus()
+        // 字色只跟「底是不是白」走：未关注用 bg_pill_play（永远白底）配黑字；
+        // 已关注用 bg_pill_dark（暗底，聚焦也只加品牌色描边不翻白）配亮字。
+        // 不再按 hasFocus 翻黑字——bg_pill_dark 聚焦保持暗底，黑字会整块消失。
+        val onWhite = !followed
         followBtn.setTextColor(
             if (onWhite) 0xFF000000.toInt() else activity.getColor(R.color.text_primary),
         )

@@ -1,7 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- tvOS 的主按钮是白色胶囊 + 黑字，不是品牌色填充 -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <corners android:radius="24dp" />
-    <solid android:color="#FFFFFFFF" />
-</shape>
+<!-- 主按钮：tvOS 风格，永远白色实心胶囊 + 黑字。
+     聚焦时不翻色（否则和旁边的次按钮撞白），改用一圈品牌色描边表达焦点，
+     黑字压在白底上始终读得清。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="24dp" />
+            <solid android:color="#FFFFFFFF" />
+            <stroke android:width="3dp" android:color="@color/accent" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="24dp" />
+            <solid android:color="#FFFFFFFF" />
+        </shape>
+    </item>
+</selector>

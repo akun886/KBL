@@ -46,16 +46,28 @@ class ProbeActivity : Activity() {
     private var running = false
     private var audioPlayer: AudioPlayer? = null
 
-    /** 固定测试视频：雷军《Are you OK》，时长短、码率低，A53 上出声快 */
-    private val testBvid = "BV1GJ411x7h7"
+    /** 默认测试视频：雷军《Are you OK》，时长短、码率低，A53 上出声快。
+     *  可通过 `am start -n ...ProbeActivity -e bvid BVxxxx` 指定任意稿件，
+     *  用于真机用当前登录账号验证取流 / 选轨（比如测大会员无损）。 */
+    private var testBvid = "BV1GJ411x7h7"
+
+    /** 是否通过 -e bvid 显式指定了稿件。指定时保留登录态（不清 Cookie），
+     *  默认自检模式仍走匿名链路。 */
+    private var explicitBvid = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        intent?.getStringExtra("bvid")?.takeIf { it.isNotBlank() }?.let {
+            testBvid = it
+            explicitBvid = true
+        }
         setContentView(buildUi())
         startButton.requestFocus()
 
         logLine("KunPlayer 探针 v${BuildConfig.VERSION_NAME}")
         logLine("设备 Android ${android.os.Build.VERSION.RELEASE} / API ${android.os.Build.VERSION.SDK_INT}")
+        logLine("目标稿件 $testBvid（可用 -e bvid 覆盖）")
+        logLine("当前登录态由 CookieStore 决定，切账号后重跑即跟随")
         logLine("按「开始自检」，会依次验证：buvid 指纹 → nav → view → playurl → 出声")
     }
 
@@ -149,7 +161,9 @@ class ProbeActivity : Activity() {
         buffer.setLength(0)
         audioPlayer?.release()
         audioPlayer = null
-        CookieStore.clear()
+        // 默认自检走匿名链路（清掉登录态，纯验链路）；显式指定 bvid 时保留登录态，
+        // 这样能用当前登录账号验证会员音质差异
+        if (!explicitBvid) CookieStore.clear()
 
         scope.launch {
             withContext(Dispatchers.IO) {

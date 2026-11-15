@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 模式胶囊。未聚焦是半透明黑，聚焦翻成白色（文字颜色由 color/pill_text 跟着翻） -->
+<!-- 次按钮：未聚焦是半透明黑胶囊，聚焦时【保持暗底】加一圈品牌色描边，不再翻白。
+     翻白会和旁边永远白色的 bg_pill_play 主按钮撞色，两个按钮就都白了、分不清焦点。
+     字色由 color/pill_text 控制——这里聚焦仍是暗底，所以聚焦字保持亮色（见 pill_text）。 -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
         <shape android:shape="rectangle">
             <corners android:radius="24dp" />
-            <solid android:color="@color/text_primary" />
+            <solid android:color="#33FFFFFF" />
+            <stroke android:width="3dp" android:color="@color/accent" />
         </shape>
     </item>
     <item>

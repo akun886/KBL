@@ -745,7 +745,10 @@
                 android:textColor="#FF000000"
                 android:textSize="18sp" />
 
-            <!-- 切换账号。登录着才出现：未登录时它和上面那颗「扫码登录」是同一件事 -->
+            <!-- 切换账号。登录着才出现：未登录时它和上面那颗「扫码登录」是同一件事。
+                 尺寸和上面那颗完全一致（18sp / padding 28·10）：两颗是并列的账号操作，
+                 主次由底色（白 / 暗）和聚焦描边区分，不该靠大小区分——上下两颗不一样宽
+                 在这块居中排布里最扎眼。 -->
             <TextView
                 android:id="@+id/account_switch"
                 android:layout_width="wrap_content"
@@ -756,13 +759,13 @@
                 android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:fontFamily="sans-serif-medium"
-                android:paddingStart="24dp"
-                android:paddingTop="9dp"
-                android:paddingEnd="24dp"
-                android:paddingBottom="9dp"
+                android:paddingStart="28dp"
+                android:paddingTop="10dp"
+                android:paddingEnd="28dp"
+                android:paddingBottom="10dp"
                 android:text="@string/account_switch"
                 android:textColor="@color/pill_text"
-                android:textSize="16sp"
+                android:textSize="18sp"
                 android:visibility="gone" />
 
             <TextView

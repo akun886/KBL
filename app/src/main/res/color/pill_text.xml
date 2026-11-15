@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 深色胶囊（bg_pill_dark）的配套字色。
 
-     bg_pill_dark 聚焦时整块翻成纯白，字不跟着翻就是白底白字——屏幕上只剩一颗
-     空胶囊，看着像按钮没画出来。凡是用 bg_pill_dark 的可聚焦控件都必须用这个，
-     不要再写死 @color/text_primary。 -->
+     bg_pill_dark 聚焦时【保持暗底】只加品牌色描边（见 drawable/bg_pill_dark.xml），
+     所以聚焦字必须保持亮色，不能翻黑——翻黑就是暗底黑字，字整块消失。
+     凡是用 bg_pill_dark 的可聚焦控件都必须用这个，不要再写死 @color/text_primary。 -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_focused="true" android:color="#FF000000" />
+    <item android:state_focused="true" android:color="#FFFFFFFF" />
     <item android:color="@color/text_primary" />
 </selector>
